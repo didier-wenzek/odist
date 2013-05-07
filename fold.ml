@@ -1,4 +1,5 @@
 open Util
+open Infix
 
 type ('a,'b,'c) red = {
   empty: 'b;
@@ -11,7 +12,6 @@ type ('a,'b,'c) red = {
 type 'a col = {
   fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
 }
-
 type 'a monoid = ('a,'a,'a) red
 type 'a option_monoid = ('a, 'a option, 'a option) red
 type ('a,'b) col_monoid = ('a, 'b, 'a col) red

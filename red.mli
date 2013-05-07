@@ -8,10 +8,8 @@ val exists: ('a -> bool) -> 'a col -> bool
 val max_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a option) red
 val min_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a option) red
 
-(*
 val first: ('a, 'a option, 'a option) red
 val last: ('a, 'a option, 'a option) red
-*)
 
 module type NUM = sig
 
@@ -29,7 +27,7 @@ module type NumRed = sig
 
   val sum: (t, t, t) red
   val product: (t, t, t) red
-  (* val count: ('a, t, t) red *)
+  val count: ('a, t, t) red
   val square_sum: (t, t, t) red
 
 end

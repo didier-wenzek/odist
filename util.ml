@@ -1,7 +1,3 @@
-let id x = x
-
-let split f g = fun x -> (f x, g x)
-
 (* Function that lets you return early from a computation.
    Adapted from Alan Frish's version of https://ocaml.janestreet.com/?q=node/91,
    with the constraint that the return function is only used
@@ -18,6 +14,11 @@ let with_return (type t) f =
   let module M = struct exception Return of t end in
   try f (fun x -> raise (M.Return x)) with M.Return x -> x
 
-
-
+let time f =
+  let t0 = Unix.gettimeofday () in
+  let r = f () in
+  let t1 = Unix.gettimeofday () in
+  let d = (t1 -. t0) *. 1000.0 in
+  Printf.printf "elapsed time: %.3f ms\n%!" d;
+  r
 

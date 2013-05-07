@@ -14,12 +14,37 @@ let min_reducer compare =
   let min a b = if compare a b >= 0 then a else b
   in opt_monoid min
 
-let first: 'a -> 'a -> 'a = fun a b -> a
-let first = opt_monoid first
+let first =
+  let append a b = match a with
+    | None -> Some b
+    | _ -> a
+  in
+  let merge a b = match a with
+    | None -> b
+    | _ -> a
+  in
+  {
+    empty = None;
+    append = append;
+    merge = merge;
+    result = id;
+    absorber = None;
+  }
 
 let last =
-  let last a b = b
-  in opt_monoid last
+  let append a b = Some b
+  in
+  let merge a b = match b with
+    | None -> a
+    | _ -> b
+  in
+  {
+    empty = None;
+    append = append;
+    merge = merge;
+    result = id;
+    absorber = None;
+  }
 
 module type NUM = sig
 
@@ -38,7 +63,7 @@ module type NumRed = sig
 
   val sum: (t, t, t) red
   val product: (t, t, t) red
-  (* val count: ('a, t, t) red *)
+  val count: ('a, t, t) red
   val square_sum: (t, t, t) red
 
 end
@@ -51,7 +76,13 @@ module Num(N: NUM) = struct
 
   let product = monoid N.one N.mul |> with_absorber N.zero
 
-  let count = red_map (fun _ -> N.one) sum
+  let count = {
+    empty = N.zero;
+    append = (fun c x -> N.add c N.one);
+    merge = N.add;
+    result = id;
+    absorber = None;
+  }
 
   let square_sum = red_map (fun x -> N.mul x x) sum
 
@@ -66,14 +97,14 @@ module CamlInt = struct
 end
 module Int = Num(CamlInt)
 
-module CamlFlot = struct
+module CamlFloat = struct
   type t = float
   let zero = 0.0
   let one = 1.0
   let add = (+.)
   let mul = ( *. )
 end
-module Float = Num(CamlFlot)
+module Float = Num(CamlFloat)
 
 module NumBigInt = struct
   type t = Big_int.big_int
