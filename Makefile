@@ -2,7 +2,7 @@ NAME = odist
 DOC = odist.docdir/index.html
 TARGETS = odist.cma odist.cmxa odist.cmi odist.a
 LIB = $(addprefix _build/, $(TARGETS)) 
-INSTALL = $(LIB) sequence.mli
+INSTALL = $(LIB)
 
 all:
 	ocamlbuild $(TARGETS)
@@ -11,7 +11,8 @@ doc:
 	ocamlbuild $(DOC)
 
 tests:
-	ocamlbuild -libs nums tests.native --
+	ocamlbuild -libs unix,nums tests.native --
+	_build/tests.native
 
 install: all
 	ocamlfind install $(NAME) META $(INSTALL)

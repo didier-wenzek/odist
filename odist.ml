@@ -1,4 +1,4 @@
 include Fold
-module Red = Red
-module Col = Col
+include Red
+include Col
 module Infix = Infix

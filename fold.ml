@@ -146,26 +146,3 @@ let col_monoid empty append merge collect =
   }
 
 
-let list xs =
-  let fold append _ acc = List.fold_left append acc xs in
-  {
-    fold = fold;
-  }
-
-let range min max =
-  let fold append _ acc =
-    let rec loop a i = if i>max then a else loop (append a i) (i+1)
-    in loop acc min
-  in
-  {
-    fold = fold;
-  }
-
-let list_reducer =
-  {
-    empty = [];
-    append = (fun xs x -> x::xs);
-    merge = (@);
-    result = (fun xs -> list (List.rev xs));
-    absorber = None;
-  }

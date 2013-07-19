@@ -14,9 +14,10 @@ let with_return (type t) f =
   let module M = struct exception Return of t end in
   try f (fun x -> raise (M.Return x)) with M.Return x -> x
 
-let time f =
+(* Compute f x and print elapsed time. *)
+let time f x =
   let t0 = Unix.gettimeofday () in
-  let r = f () in
+  let r = f x in
   let t1 = Unix.gettimeofday () in
   let d = (t1 -. t0) *. 1000.0 in
   Printf.printf "elapsed time: %.3f ms\n%!" d;

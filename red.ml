@@ -46,6 +46,24 @@ let last =
     absorber = None;
   }
 
+let to_list =
+  {
+    empty = [];
+    append = (fun xs x -> x::xs);
+    merge = (@);
+    result = (fun xs -> List.rev xs);
+    absorber = None;
+  }
+
+let to_bag =
+  {
+    empty = [];
+    append = (fun xs x -> x::xs);
+    merge = (@);
+    result = id;
+    absorber = None;
+  }
+
 module type NUM = sig
 
   type t

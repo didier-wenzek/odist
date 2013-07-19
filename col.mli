@@ -1,4 +1,14 @@
+val list: 'a list -> 'a Fold.col
+val range: int -> int -> int Fold.col
+
 val files: string -> string Fold.col
+(* [files rootpath] returns recursively all files of the given directory. *)
+
 val file: string -> char Fold.col
+(* [file path] returns all characters of the given file. *)
+
 val lines: string -> string Fold.col
+(* [lines path] returns all lines of the given file. *)
+
 val words: string -> string Fold.col
+(* [words path] returns all words of the given file. *)

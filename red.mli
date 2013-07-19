@@ -10,6 +10,8 @@ val min_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a option) red
 
 val first: ('a, 'a option, 'a option) red
 val last: ('a, 'a option, 'a option) red
+val to_list: ('a, 'a list, 'a list) red
+val to_bag: ('a, 'a list, 'a list) red
 
 module type NUM = sig
 

@@ -59,6 +59,3 @@ val red_filter: ('a -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
 val red_product: ('a,'b,'c) red -> ('a,'d,'e) red -> ('c -> 'e -> 'f) -> ('a, 'b*'d, 'f) red
 
 type ('a,'b) col_monoid = ('a, 'b, 'a col) red
-val list: 'a list -> 'a col
-val range: int -> int -> int col
-val list_reducer: ('a, 'a list, 'a col) red

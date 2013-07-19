@@ -1,6 +1,21 @@
 open Unix
 open Fold
 
+let list xs =
+  let fold append _ acc = List.fold_left append acc xs in
+  {
+    fold = fold;
+  }
+
+let range min max =
+  let fold append _ acc =
+    let rec loop a i = if i>max then a else loop (append a i) (i+1)
+    in loop acc min
+  in
+  {
+    fold = fold;
+  }
+
 (* [foldfiles comb seed path] iterates recursively over all sub-paths of the directory with the given [path]. *)
 let foldfiles comb seed path =
   let iterdir f path =
@@ -12,7 +27,7 @@ let foldfiles comb seed path =
         then f (Filename.concat path name)
       done
     with End_of_file -> closedir dir
-    | error -> closedir dir; raise error
+       | error -> closedir dir; raise error
   in
   let acc = ref seed in
   let rec combfiles path =
