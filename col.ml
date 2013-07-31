@@ -45,6 +45,25 @@ let files path =
     fold = fold
   }
 
+(* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
+let fold_file_chunks size path comb seed =
+  let channel = open_in path in
+  let buffer = String.create size in
+  let rec loop acc =
+    let l = input channel buffer 0 size in
+    if l = 0
+    then (close_in channel; acc)
+    else loop (comb acc (String.sub buffer 0 l))
+  in try loop seed
+     with  error -> close_in channel; raise error
+
+let file_chunks size path =
+  let fold append _ seed = fold_file_chunks size path append seed in
+  {
+    fold = fold
+  }
+
+(** folds chars of substring. *)
 let string_chars str start len comb seed =
   let get pos = String.get str pos in
   let last = start + len in
@@ -70,7 +89,7 @@ let file path =
   let fold append _ seed = file_characters path append seed in
   {
     fold = fold
-  }
+}
 
 (* string processing *)
 let token_combiner is_sep seed comb term =

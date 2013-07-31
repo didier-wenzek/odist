@@ -50,7 +50,7 @@ let to_list =
   {
     empty = [];
     append = (fun xs x -> x::xs);
-    merge = (@);
+    merge = (fun xs ys -> ys @ xs);
     result = (fun xs -> List.rev xs);
     absorber = None;
   }
@@ -59,7 +59,7 @@ let to_bag =
   {
     empty = [];
     append = (fun xs x -> x::xs);
-    merge = (@);
+    merge = List.rev_append;
     result = id;
     absorber = None;
   }
