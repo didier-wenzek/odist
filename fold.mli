@@ -1,13 +1,14 @@
-(** Abstraction of dataset processing using union fold.
+(** Abstraction of dataset processing using union fold. *)
 
-  A dataset is only defined indirectly by the ability to fold its content using a reducer
-  which brings:
+type 'a col = {
+  fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
+}
+(** Collection type.
+
+  A dataset is only defined indirectly by the ability to fold its content into an aggregate using
   - an empty initial aggregate,
   - a function to inject one item into an aggregate,
-  - a function to merge two aggregates,
-  - a function to extract some final result from the aggregate.
-
-
+  - a function to merge two aggregates.
 *)
 
 type ('a,'b,'c) red = {
@@ -31,11 +32,6 @@ type 'a monoid = ('a,'a,'a) red
 type 'a option_monoid = ('a, 'a option, 'a option) red
 (**
 *)
-
-type 'a col = {
-  fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
-}
-(** Collection type. *)
 
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'b,'c) red -> 'a col -> 'c

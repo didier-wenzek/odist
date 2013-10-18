@@ -1,5 +1,10 @@
+(** Collections *)
+
 val list: 'a list -> 'a Fold.col
+(* [list l] wraps the ocaml list [l] into a foldable collection. *)
+
 val range: int -> int -> int Fold.col
+(* [range min max] builds the foldable collection of all intergers from [min] to [max] inclusive. *)
 
 val files: string -> string Fold.col
 (* [files rootpath] returns recursively all files of the given directory. *)

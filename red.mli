@@ -1,3 +1,5 @@
+(** Reducers *)
+
 open Fold
 
 val and_reducer: (bool, bool, bool) red
