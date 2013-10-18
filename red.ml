@@ -65,30 +65,26 @@ let to_bag =
   }
 
 module type NUM = sig
-
   type t
 
   val zero: t
   val one: t
   val add: t -> t -> t
   val mul: t -> t -> t
-
 end
 
-module type NumRed = sig
-
-  type t
+module type NUMRED = sig
+  include NUM
 
   val sum: (t, t, t) red
   val product: (t, t, t) red
   val count: ('a, t, t) red
   val square_sum: (t, t, t) red
-
 end
 
-module Num(N: NUM) = struct
+module NumRed(N: NUM) = struct
 
-  type t = N.t
+  include N
 
   let sum = monoid N.zero N.add
 
@@ -103,7 +99,6 @@ module Num(N: NUM) = struct
   }
 
   let square_sum = red_map (fun x -> N.mul x x) sum
-
 end
 
 module CamlInt = struct
@@ -113,7 +108,7 @@ module CamlInt = struct
   let add = (+)
   let mul = ( * )
 end
-module Int = Num(CamlInt)
+module Int = NumRed(CamlInt)
 
 module CamlFloat = struct
   type t = float
@@ -122,7 +117,7 @@ module CamlFloat = struct
   let add = (+.)
   let mul = ( *. )
 end
-module Float = Num(CamlFloat)
+module Float = NumRed(CamlFloat)
 
 module NumBigInt = struct
   type t = Big_int.big_int
@@ -131,4 +126,9 @@ module NumBigInt = struct
   let add = Big_int.add_big_int
   let mul = Big_int.mult_big_int
 end
-module BigInt = Num(NumBigInt)
+module BigInt = NumRed(NumBigInt)
+
+module Int32 = NumRed(Int32)
+module Int64 = NumRed(Int64)
+module Nativeint = NumRed(Nativeint)
+module Complex = NumRed(Complex)
