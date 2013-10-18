@@ -31,6 +31,8 @@ A dataset is only defined indirectly by its ability to fold its content using
 - a function to inject one item into an aggregate,
 - a function to merge two aggregates.
 
+For instance, we can wrap nested lists into a collection:
+
     type 'a nested_list = L of 'a list | N of 'a nested_list list
     let fold_nested_list append merge empty =
         let rec fold l = match l with
