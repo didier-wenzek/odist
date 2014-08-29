@@ -39,3 +39,11 @@ let _ =
   let fs_list = fs |> reduce to_list in
   let fs_count = fs |> reduce Int.count in
   assert( fs_count = List.length fs_list);
+
+  let s = range 1 1000000000 |> exists even in
+  assert (s);
+
+  let s = range 1 1000000000 |> forall even in
+  assert (not s);
+
+

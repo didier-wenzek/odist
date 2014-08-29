@@ -19,10 +19,9 @@ type ('a,'b) col_monoid = ('a, 'b, 'a col) red
 let reduce red col =
   let acc = match red.absorber with
   | None -> col.fold red.append red.merge red.empty
-  | Some(null) -> with_return (fun return ->
-    let return_if_null acc = if acc = null then return acc else acc in
-    let append_with_return acc i = return_if_null (red.append acc i) in
-    col.fold append_with_return red.merge red.empty
+  | Some(absorber) -> with_return (fun return ->
+    let append_or_return acc i = if acc = absorber then return acc else red.append acc i in
+    col.fold append_or_return red.merge red.empty
   )
   in red.result acc
 
