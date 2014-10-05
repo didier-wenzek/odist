@@ -46,4 +46,8 @@ let _ =
   let s = range 1 1000000000 |> forall even in
   assert (not s);
 
+  let s = range 1 100 |> map string_of_int |> flatmap (fun s -> list [s;"\n"]) |> stream (printer_to "/tmp/foo") in
+  let s = lines "/tmp/foo" |> map int_of_string |> reduce sum in
+  assert (s = 50 * 101 );
+
 
