@@ -42,7 +42,7 @@ let printer = {
   term = (fun () -> ());
 }
 
-let printer_to file = {
+let file_printer file = {
   init = (fun () -> open_out file);
   act = (fun s out -> output_string out s; out);
   term = close_out;

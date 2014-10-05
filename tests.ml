@@ -49,7 +49,7 @@ let _ =
   let s = range 0 9 |> map string_of_int |> stream_to (string_buffer 16) in
   assert ( s = "0123456789");
 
-  range 1 100 |> map string_of_int |> flatmap (fun s -> list [s;"\n"]) |> stream_to (printer_to "/tmp/foo");
+  range 1 100 |> map string_of_int |> flatmap (fun s -> list [s;"\n"]) |> stream_to (file_printer "/tmp/foo");
   let s = lines "/tmp/foo" |> map int_of_string |> reduce sum in
   assert (s = 50 * 101 );
 

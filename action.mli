@@ -19,7 +19,7 @@ val stream_to : ('a,'s,'b) action -> 'a Fold.col -> 'b
 val printer : (string, unit, unit) action
 
 (* Printing action of a stream of strings on a file. *)
-val printer_to : string -> (string, out_channel, unit) action
+val file_printer : string -> (string, out_channel, unit) action
 
 (* Buffering action of a stream of strings into a string buffer.
 
