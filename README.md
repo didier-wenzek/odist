@@ -74,7 +74,7 @@ Note that these transformations are lazy: they are only performed when the datas
       }
 
 
-Reductions are driven by reducers which provide the arguments by a collection to be folded.
+Reductions are driven by reducers which provide the arguments required by a collection to be folded.
 A reducer of type `(item, aggregate, outcome) Fold.red` reduces a collection of `item` into an `aggregate` and than into a final `outcome`. It provides:
 - an `empty` initial aggregate,
 - an `append` function aimed to inject one item into an aggregate,
@@ -114,11 +114,11 @@ which threads string action to an `out_channel` and finally returns a `unit` res
     }
 
 A call to `[col |> stream_to action]`, 
-- starts to initialize the statefull system calling [action.init] getting here an `out_channel`.
-- Then each items of the collection [col] is used to act on the system,
-  applying [action.act item] on the current state to get the new one.
+- starts to initialize the statefull system calling `action.init] getting here an `out_channel`.
+- Then each items of the collection `col` is used to act on the system,
+  applying `action.act item` on the current state to get the new one.
   Here each string is printed to the channel.
-- Finally the system resources are released using [action.term],
+- Finally the system resources are released using `action.term`,
   closing the channel in the case of `file_printer`.
     
 
