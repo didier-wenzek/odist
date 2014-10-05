@@ -1,9 +1,9 @@
 open Fold
 
-type ('a,'s) action = {
+type ('a,'s,'b) action = {
   init: unit -> 's;
   act: 'a -> 's -> 's;
-  term: 's -> unit;
+  term: 's -> 'b;
 }
 
 type 's computation = State of 's | Action of ('s -> 's)
@@ -30,7 +30,7 @@ let actor action =
     absorber = None;
   }
 
-let stream action col =
+let stream_to action col =
   let actor = actor action in
   let state = State (action.init ()) in
   try actor.result (col.fold actor.append actor.merge state)
@@ -47,3 +47,10 @@ let printer_to file = {
   act = (fun s out -> output_string out s; out);
   term = close_out;
 }
+
+let string_buffer size =
+  {
+    init = (fun () -> Buffer.create size);
+    act = (fun str buf -> Buffer.add_string buf str; buf);
+    term = (fun buf -> Buffer.contents buf);
+  }

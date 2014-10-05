@@ -33,9 +33,8 @@ let comb_unnest f comb merge acc item1 =
     (f item1).fold pcomb merge acc
 
 let map f col =
-  let fold append = col.fold (comb_map f append) in
   {
-    fold = fold
+    fold = (fun append -> col.fold (comb_map f append));
   }
 
 let flatmap f col =

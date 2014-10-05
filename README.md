@@ -14,7 +14,7 @@ The core of ODist is dataset processing :
 
 All input datasets are abstracted by a single type `'a Odist.col`
 which values can be uniformaly manipulated
-whatever the underlying data structure.
+whatever their underlying data structure.
 
     range 1 100
     list [1;2;3;4;5]
@@ -26,12 +26,19 @@ whatever the underlying data structure.
     list [1;2;3;4;5] |> sum_square_of_evens
     lines "/tmp/foo" |> map int_of_string |> sum_square_of_evens
 
-A dataset is only defined indirectly by its ability to fold its content using
-- an empty initial aggregate,
+Note the `list [1;2;3;4;5]` construct which wraps a regular OCaml list into a general an `Odist.col`-lection;
+and, similarly, the `lines "/tmp/foo"` call which turns a file into a collection of strings.
+
+Underneath, a collection is only indirectly defined by its ability to fold its content using
 - a function to inject one item into an aggregate,
 - a function to merge two aggregates.
+- an initial aggregate,
 
-For instance, we can wrap nested lists into a collection:
+    type 'a col = {
+      fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
+    }
+
+For instance, we can implement a collection using a tree of nested lists as representation:
 
     type 'a nested_list = L of 'a list | N of 'a nested_list list
     let fold_nested_list append merge empty =
@@ -57,14 +64,22 @@ The result is a dataset, so transformations can be chained.
     
     files "." |> flatmap words |> map String.lowercase |> filter (fun w -> (String.get w 0) = 'a')
 
-Note that these transformations are lazy: they are performed only when the dataset is actually reduced into some aggregate.
-Such a reduction is driven by a reducer which gives the three arguments expected by a collection to be folded plus a fourth one aimed to finalize the reduction:
+Note that these transformations are lazy: they are only performed when the dataset is actually reduced into some aggregate. For instance, underneath a mapped collection simply waits for a call to the `fold` function to transform the given `append` argument and to forward the call to the former collection.
+
+    let map f col =
+      let transform append = (fun acc item -> append acc (f item)) in
+      {
+        fold = (fun append merge seed -> col.fold (transform append) merge seed);
+      }
+
+
+A reduction is driven by a reducer which gives the three arguments expected by a collection to be folded plus a fourth one aimed to finalize the reduction:
 - an `empty` initial aggregate,
 - an `append` function aimed to inject one item into an aggregate,
 - a `merge` function aimed to merge two aggregates,
 - a `result` function which transform an aggregate into a final outcome.
 
-This gives a reducer of type `(item, aggregate, outcome) Fold.red`, which reduces a collection of `item` into an `aggregate` and than into a final `outcome`.
+A reducer of type `(item, aggregate, outcome) Fold.red` reduces a collection of `item` into an `aggregate` and than into a final `outcome`.
 
 Reducers are built around an associative binary operation with an identity element (*a.k.a. a monoid*).
 
@@ -77,6 +92,16 @@ Reducers are built around an associative binary operation with an identity eleme
 Reducers can be combined too:
 
     let count = red_map (fun _ -> 1) sum
-    let mean = red_product Float.sum Float.count (/.)
+    let sum_float = monoid 0.0 (+.)
+    let mean = red_product sum_float count (fun s c -> s /. (float_of_int c))
 
     lines "/tmp/bar" |> map float_of_string |> reduce mean
+
+Note that the type of `mean` is `(float, __float * int__, float) Odist.red`: the accumulated values are `(sum, count)` pairs which can only be translated into a result when the reduction is fully done. Hence the `result` function of any reducer. In the `mean` reducer case, the `result` of a final `(sum, count)` pair is simply the `sum` divided by the `count`.
+
+Another way a collection may be reduced is by streaming its content to some effectfull device.
+
+    list ["foo";"bar"] |> stream_to (file_printer "/tmp/foo")
+
+
+    
