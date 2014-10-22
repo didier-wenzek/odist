@@ -1,6 +1,26 @@
 open Unix
 open Fold
 
+let empty = {
+    fold = (fun _ _ e -> e);
+  }
+
+let single x = {
+    fold = (fun append _ e -> append e x);
+  }
+
+let cons x xs = {
+   fold = (fun append concat seed -> xs.fold append concat (append seed x));
+}
+
+let append xs x = {
+    fold = (fun append concat e -> append (xs.fold append concat e) x);
+  }
+
+let concat xs ys = {
+    fold = (fun append concat e -> ys.fold append concat (xs.fold append concat e));
+  }
+
 let list xs =
   let fold append _ acc = List.fold_left append acc xs in
   {

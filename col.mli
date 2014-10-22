@@ -1,5 +1,17 @@
 (** Collections *)
 
+val empty: 'a Fold.col
+(* The empty collection. *)
+
+val single: 'a -> 'a Fold.col
+(* [single i] wraps the item [i] into a foldable collection. *)
+
+val append: 'a Fold.col -> 'a -> 'a Fold.col
+(* [append xs x] appends [x] to the collection [xs]. *)
+
+val concat: 'a Fold.col -> 'a Fold.col -> 'a Fold.col
+(* [concat xs ys] concats the two collections into a new foldable collection. *)
+
 val list: 'a list -> 'a Fold.col
 (* [list l] wraps the ocaml list [l] into a foldable collection. *)
 
