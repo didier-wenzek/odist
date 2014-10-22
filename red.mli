@@ -14,6 +14,7 @@ val first: ('a, 'a option, 'a option) red
 val last: ('a, 'a option, 'a option) red
 val to_list: ('a, 'a list, 'a list) red
 val to_bag: ('a, 'a list, 'a list) red
+val to_set : (module Set.S with type elt = 'a and type t = 'aset) -> ('a, 'aset, 'aset) red
 
 module type NUM = sig
   type t

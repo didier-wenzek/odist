@@ -64,6 +64,15 @@ let to_bag =
     absorber = None;
   }
 
+let to_set (type a) (type aset) (module Set : Set.S with type elt = a and type t = aset) =
+  {
+    empty = Set.empty;
+    append = (fun xs x -> Set.add x xs);
+    merge = Set.union;
+    result = id;
+    absorber = None;
+  }
+
 module type NUM = sig
   type t
 
