@@ -36,19 +36,19 @@ let range min max =
     fold = fold;
   }
 
-(* [foldfiles comb seed path] iterates recursively over all sub-paths of the directory with the given [path]. *)
-let foldfiles comb seed path =
-  let iterdir f path =
-    let dir = opendir path in
-    try
-      while true do
-        let name = readdir dir in
-        if (name <> "." && name <> "..")
-        then f (Filename.concat path name)
-      done
-    with End_of_file -> closedir dir
-       | error -> closedir dir; raise error
-  in
+let iterdir f path =
+  let dir = opendir path in
+  try
+    while true do
+      let name = readdir dir in
+      if (name <> "." && name <> "..")
+      then f (Filename.concat path name)
+    done
+  with End_of_file -> closedir dir
+     | error -> closedir dir; raise error
+
+(* [recfoldfiles comb seed directory] iterates recursively over all sub-paths of the given [directory]. *)
+let recfoldfiles comb seed path =
   let acc = ref seed in
   let rec combfiles path =
     try
@@ -59,11 +59,83 @@ let foldfiles comb seed path =
     with _ -> ()
   in combfiles path; !acc
 
-let files path = 
-  let fold append _ seed = foldfiles append seed path in
-  {
-    fold = fold
-  }
+(* [foldfiles comb seed directory] iterates over all direct sub-paths of the given [directory]. *)
+let foldfiles comb seed path =
+  let acc = ref seed in
+  let combfiles path =
+    try
+      match (lstat path).st_kind with
+      | S_REG -> acc := comb !acc path
+      | _ -> ()
+    with _ -> ()
+  in let combfiles path =
+    try
+      match (lstat path).st_kind with
+      | S_REG -> acc := comb !acc path
+      | S_DIR -> iterdir combfiles path
+      | _ -> ()
+    with _ -> ()
+  in combfiles path; !acc
+
+let files ?(recursive = true) path = 
+  if recursive
+  then
+    let fold append _ seed = recfoldfiles append seed path in
+    {
+      fold = fold
+    }
+  else
+    let fold append _ seed = foldfiles append seed path in
+    {
+      fold = fold
+    }
+
+(* [recfoldsubdirs comb seed directory] iterates recursively over all sub-dirs of the given [directory]. *)
+let recfoldsubdirs comb seed path =
+  let acc = ref seed in
+  let rec combfiles path =
+    try
+      match (lstat path).st_kind with
+      | S_DIR -> acc := comb !acc path ; iterdir combfiles path
+      | _ -> ()
+    with _ -> ()
+  in combfiles path; !acc
+
+(* [foldsubdirs comb seed directory] iterates over all sub-dirs of the given [directory]. *)
+let foldsubdirs comb seed path =
+  let acc = ref seed in
+  let combfiles path =
+    try
+      match (lstat path).st_kind with
+      | S_DIR -> acc := comb !acc path
+      | _ -> ()
+    with _ -> ()
+  in iterdir combfiles path; !acc
+
+let subdirs ?(recursive = true) path = 
+  if recursive
+  then
+    let fold append _ seed = recfoldsubdirs append seed path in
+    {
+      fold = fold
+    }
+  else
+    let fold append _ seed = foldsubdirs append seed path in
+    {
+      fold = fold
+    }
+
+(* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
+let fold_file_chunks size path comb seed =
+  let channel = open_in path in
+  let buffer = String.create size in
+  let rec loop acc =
+    let l = input channel buffer 0 size in
+    if l = 0
+    then (close_in channel; acc)
+    else loop (comb acc (String.sub buffer 0 l))
+  in try loop seed
+     with  error -> close_in channel; raise error
 
 (* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
 let fold_file_chunks size path comb seed =

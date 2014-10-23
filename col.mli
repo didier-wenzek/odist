@@ -18,8 +18,15 @@ val list: 'a list -> 'a Fold.col
 val range: int -> int -> int Fold.col
 (* [range min max] builds the foldable collection of all intergers from [min] to [max] inclusive. *)
 
-val files: string -> string Fold.col
-(* [files rootpath] returns recursively all files of the given directory. *)
+val subdirs: ?recursive:bool -> string -> string Fold.col
+(* [subdirs rootpath] returns recursively all sub-directories of the given directory (including itself).
+   [subdirs ~recursive=false rootpath] returns all direct sub-directories of the given directory (excluding itself).
+*)
+
+val files: ?recursive:bool -> string -> string Fold.col
+(* [files rootpath] returns recursively all regular files of the given directory.
+   [files ~recursive=false rootpath] returns recursively all direct regular files of the given directory.
+*)
 
 val file_chunks: int -> string -> string Fold.col
 (* [file_chunks size path] breaks the file in chunks of the given size. *)
