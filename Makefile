@@ -11,7 +11,7 @@ doc:
 	ocamlbuild $(DOC)
 
 tests:
-	ocamlbuild -libs unix,nums tests.native --
+	ocamlbuild -libs unix,nums,ozmq -lflags -cclib,-lzmq tests.native --
 	_build/tests.native
 
 install: all
