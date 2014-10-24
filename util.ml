@@ -1,3 +1,16 @@
+(** [using_context init term f arg] applies the function [f]
+    to the [context] value returned by [init arg],
+    ensures that [term context] is called
+    and returns the value of [f context].
+
+    [val using_context : ('arg -> 'ctx) -> ('ctx -> 'unit) -> ('ctx -> 'res) -> 'arg -> 'res]
+*)
+let using_context init term task arg =
+  let ctx = init arg in
+  try let result = task ctx in term ctx; result
+  with error -> term ctx; raise error
+  
+
 (* Function that lets you return early from a computation.
    Adapted from Alan Frish's version of https://ocaml.janestreet.com/?q=node/91,
    with the constraint that the return function is only used
