@@ -33,6 +33,16 @@ let make_reducer empty append merge =
     absorber = None;
   }
 
+let make_channel_name =
+  let pid = Unix.getpid () in
+  let seq = ref 0 in
+  let next_channel_name ipc_dir =
+      seq := !seq + 1;
+      Printf.sprintf "%s/odist-%d-%d-channel" ipc_dir pid !seq
+  in next_channel_name
+
+let ipc_channel channel_name point = Printf.sprintf "ipc:///%s.%s" channel_name point
+
 module ZmqPullPushCores : sig
   (** Type of cluster handlers. *)
   type t
@@ -72,7 +82,6 @@ module ZmqPullPushCores : sig
 end = struct
   type t = {
     context: Zmq.context;
-    ipcdir: string;
     size: int;
     this_node: string;
   }
@@ -81,25 +90,22 @@ end = struct
   
   let node_set cluster = range 0 (cluster.size - 1) |> reduce (to_set (module NodeSet))
   
-  let init ipcdir size this_node = {
+  let init size this_node = {
      context = Zmq.ctx_new ();
      size = size;
-     ipcdir = ipcdir;
      this_node = string_of_int this_node;
   }
   
   let term cluster = Zmq.ctx_destroy cluster.context
   
-  let local_channel ipcdir channel_name point = Printf.sprintf "ipc:///%s/%s.%s" ipcdir channel_name point
-  
   let connect_outfan cluster channel_name point =
-    let channel = local_channel cluster.ipcdir channel_name (string_of_int point) in
+    let channel = ipc_channel channel_name (string_of_int point) in
     let outfan = Zmq.socket cluster.context Zmq.PUSH in
     Zmq.connect outfan channel;
     outfan
   
   let bind_infan cluster channel_name =
-    let channel = local_channel cluster.ipcdir channel_name cluster.this_node in
+    let channel = ipc_channel channel_name cluster.this_node in
     let infan = Zmq.socket cluster.context Zmq.PULL in 
     Zmq.bind infan channel;
     infan
@@ -178,7 +184,7 @@ end = struct
     }
   
   let distribute ipcdir size col =
-    let using_cluster m task = using_context (init ipcdir m) term task in
+    let using_cluster m task = using_context (init m) term task in
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
@@ -187,10 +193,12 @@ end = struct
     let par_fold append merge seed =
        let partial_reducer = make_reducer seed append merge in
        let final_reducer = make_reducer seed merge merge in
+       let channel_A = make_channel_name ipcdir in
+       let channel_B = make_channel_name ipcdir in
        begin
-         launch_bg 1 size (fun cluster -> col |> stream_to_channel cluster "AAA");
-         launch_bg size 1 (fun cluster -> gather_from_channel cluster "AAA" |> reduce partial_reducer |> single |> stream_to_channel cluster "BBB");
-         launch_fg size   (fun cluster -> gather_from_channel cluster "BBB" |> reduce final_reducer)
+         launch_bg 1 size (fun cluster -> col |> stream_to_channel cluster channel_A);
+         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> reduce partial_reducer |> single |> stream_to_channel cluster channel_B);
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> reduce final_reducer)
        end
     in
     {
@@ -202,7 +210,12 @@ type cluster = {
   distribute: 'a. 'a Fold.col -> 'a Fold.col
 }
 
-let mcores ?(ipc_dir = "/tmp") core_count = {
+let mcores ?ipc_dir core_count =
+  let ipc_dir = match ipc_dir with
+    | None -> Filename.get_temp_dir_name ()
+    | Some(ipc_dir) -> ipc_dir
+  in
+  {
     distribute = (fun col -> ZmqPullPushCores.distribute ipc_dir core_count col);
   }
 
