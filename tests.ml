@@ -61,8 +61,9 @@ let _ =
   let s = lines "/tmp/foo" |> map int_of_string |> reduce sum in
   assert (s = 50 * 101 );
 
-  let s_par = range 1 100 |> distribute 4 |> sum_square_of_evens in
-  let s_seq = range 1 100 |>                 sum_square_of_evens in
+  let cores = Cluster.mcores 4 in
+  let s_par = range 1 100 |> cores.distribute |> sum_square_of_evens in
+  let s_seq = range 1 100 |>                     sum_square_of_evens in
   assert (s_par = s_seq);
 
 
