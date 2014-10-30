@@ -19,7 +19,7 @@ let nested_list xs =
       fold = foldxs
     }
 
-module S = Set.Make(struct
+module S = MakeSetRed(struct
   type t = int
   let compare = compare
 end)
@@ -40,7 +40,7 @@ let _ =
   let fact n = (range 1 n |> reduce Int.product) in
   assert( 120 = (fact 5));
 
-  let f_image f xs = list (xs) |> map f |> reduce (to_set (module S)) |> S.elements in
+  let f_image f xs = list (xs) |> map f |> reduce S.union_reducer |> S.elements in
   assert(f_image square [-2; -1; 0; 1; 2 ] = [0; 1; 4]);
 
   let fs = files(".") in

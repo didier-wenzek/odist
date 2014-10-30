@@ -64,14 +64,65 @@ let to_bag =
     absorber = None;
   }
 
-let to_set (type a) (type aset) (module Set : Set.S with type elt = a and type t = aset) =
+module type SET = sig
+  include Set.S
+
+  val union_reducer : (elt, t, t) red
+  val items: t -> elt col
+end
+
+module SetRed(S: Set.S) = struct
+  include S
+
+  let union_reducer =
   {
-    empty = Set.empty;
-    append = (fun xs x -> Set.add x xs);
-    merge = Set.union;
+    empty = S.empty;
+    append = (fun xs x -> S.add x xs);
+    merge = S.union;
     result = id;
     absorber = None;
   }
+
+  let items xs =
+  {
+     fold = (fun append _ acc -> S.fold (fun x xs -> append xs x) xs acc);
+  }
+end
+
+module MakeSetRed(E: Set.OrderedType) = SetRed(Set.Make(E))
+
+module type MAP = sig
+  include Map.S
+
+  val grouping_with: ('a,'b,'b) red -> (key * 'a, 'b t, 'b t) red
+  val pairs: 'a t -> (key*'a) col
+end
+
+module MapRed(M: Map.S) = struct
+  include M
+
+  let grouping_with value_reducer =
+    let get m k = try M.find k m with Not_found -> value_reducer.empty in
+    let value_merger k oa ob = match (oa,ob) with
+      | (None, _) -> ob
+      | (_, None) -> oa
+      | (Some a, Some b) -> Some (value_reducer.merge a b)
+    in
+    {
+      empty = M.empty;
+      append = (fun m (k,v) -> let v' = get m k in let v'' = value_reducer.append v' v in M.add k v'' m);
+      merge = M.merge value_merger;
+      result = id;
+      absorber = None;
+    }
+
+  let pairs m =
+    {
+      fold = (fun append _ acc -> M.fold (fun k v acc -> append acc (k,v)) m acc);
+    }
+end
+
+module MakeMapRed(E: Map.OrderedType) = MapRed(Map.Make(E))
 
 module type NUM = sig
   type t
