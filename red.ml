@@ -1,8 +1,8 @@
 open Fold
 open Infix
 
-let and_reducer = monoid true (&&) |> with_absorber false
-let or_reducer = monoid false (||) |> with_absorber true
+let and_reducer = monoid true (&&) |> with_maximum_check not
+let or_reducer = monoid false (||) |> with_maximum_check id
 let forall p = fold p and_reducer
 let exists p = fold p or_reducer
 
@@ -28,7 +28,7 @@ let first =
     append = append;
     merge = merge;
     result = id;
-    absorber = None;
+    maximum = Some (fun x -> match x with None -> false | _ -> true);
   }
 
 let last =
@@ -43,7 +43,16 @@ let last =
     append = append;
     merge = merge;
     result = id;
-    absorber = None;
+    maximum = None;
+  }
+
+let taking n reducer =
+  {
+     empty = (0,reducer.empty);
+     result = (fun (_,r) -> reducer.result r);
+     append = (fun (c,xs) x -> (c+1, reducer.append xs x));
+     merge = (fun (c,xs) (d,ys) -> (c+d, reducer.merge xs ys)); (* FIXME: how to avoid taking more than n items. *)
+     maximum = Some (fun (c,_) -> c >= n);
   }
 
 let to_list =
@@ -52,7 +61,7 @@ let to_list =
     append = (fun xs x -> x::xs);
     merge = (fun xs ys -> ys @ xs);
     result = (fun xs -> List.rev xs);
-    absorber = None;
+    maximum = None;
   }
 
 let to_bag =
@@ -61,7 +70,7 @@ let to_bag =
     append = (fun xs x -> x::xs);
     merge = List.rev_append;
     result = id;
-    absorber = None;
+    maximum = None;
   }
 
 module type SET = sig
@@ -80,7 +89,7 @@ module SetRed(S: Set.S) = struct
     append = (fun xs x -> S.add x xs);
     merge = S.union;
     result = id;
-    absorber = None;
+    maximum = None;
   }
 
   let items xs =
@@ -115,7 +124,7 @@ module MapRed(M: Map.S) = struct
       append = (fun m (k,v) -> let v' = get m k in let v'' = value_reducer.append v' v in M.add k v'' m);
       merge = M.merge value_merger;
       result = id;
-      absorber = None;
+      maximum = None;
     }
 
   let grouping_by k reducer = mapping (fun x -> (k x,x)) (grouping_with reducer) 
@@ -153,14 +162,14 @@ module NumRed(N: NUM) = struct
 
   let sum = monoid N.zero N.add
 
-  let product = monoid N.one N.mul |> with_absorber N.zero
+  let product = monoid N.one N.mul |> with_maximum N.zero
 
   let count = {
     empty = N.zero;
     append = (fun c x -> N.add c N.one);
     merge = N.add;
     result = id;
-    absorber = None;
+    maximum = None;
   }
 
   let square_sum = mapping (fun x -> N.mul x x) sum

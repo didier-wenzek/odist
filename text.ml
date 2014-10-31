@@ -58,12 +58,12 @@ let pack_split_reducer split reducer =
     | B(l,m,r) -> reducer_prepend l (reducer.append m r) 
   in
   let result a = reducer.result (pack a) in
-  let absorber = None
+  let maximum = None
   in
   {
     empty = empty;
     append = append;
     merge = merge;
     result = result;
-    absorber = absorber;
+    maximum = maximum;
   }

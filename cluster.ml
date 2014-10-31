@@ -5,7 +5,7 @@ open Col
 open Red
 open Util
 
-module NodeSet = Set.Make(struct
+module NodeSet = MakeSetRed(struct
   type t = int
   let compare = compare
 end)
@@ -30,7 +30,7 @@ let make_reducer empty append merge =
     append = append;
     merge = merge;
     result = id;
-    absorber = None;
+    maximum = None;
   }
 
 let make_channel_name =
@@ -78,6 +78,7 @@ module ZmqPullPushCores : sig
 
   (** [col |> distribute ipcdir node_count] distributes the elements of a collection over the cluster nodes.*)
   val distribute: string -> int -> 'a Fold.col -> 'a Fold.col
+  val fair_distribute: string -> int -> 'a Fold.col -> 'a Fold.col
 
 end = struct
   type t = {
@@ -87,8 +88,8 @@ end = struct
   }
   
   type outfan = Zmq.socket array
-  
-  let node_set cluster = range 0 (cluster.size - 1) |> reduce (to_set (module NodeSet))
+
+  let node_set cluster = range 0 (cluster.size - 1) |> reduce NodeSet.union_reducer
   
   let init size this_node = {
      context = Zmq.ctx_new ();
@@ -125,6 +126,29 @@ end = struct
        init = connect;
        act = push;
        term = Array.iter close_outfan;
+    }
+  
+  let connect_outfan cluster channel_name point =
+    let channel = ipc_channel channel_name (string_of_int point) in
+    let outfan = Zmq.socket cluster.context Zmq.PUSH in
+    Zmq.connect outfan channel;
+    outfan
+
+  let fair_scatter cluster channel_name  =
+    let connect_outfan point outfan =
+      let channel = ipc_channel channel_name (string_of_int point) in 
+      Zmq.connect outfan channel; outfan
+    in
+    let outfan_connector = {
+      init = (fun () -> Zmq.socket cluster.context Zmq.PUSH);
+      act = connect_outfan;
+      term = id;
+    } in
+    let push msg outfan = send cluster.this_node msg outfan;outfan in
+    {
+       init = (fun () -> range 0 (cluster.size -1) |> stream_to outfan_connector);
+       act = push;
+       term = close cluster.this_node;
     }
   
   let gather_fold cluster channel_name append acc =
@@ -189,6 +213,28 @@ end = struct
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
     let stream_to_channel cluster name = stream_to (scatter cluster name |> encoding_with encode |> using_roundrobin) in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
+    let par_fold append merge seed =
+       let partial_reducer = make_reducer seed append merge in
+       let final_reducer = make_reducer seed merge merge in
+       let channel_A = make_channel_name ipcdir in
+       let channel_B = make_channel_name ipcdir in
+       begin
+         launch_bg 1 size (fun cluster -> col |> stream_to_channel cluster channel_A);
+         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> reduce partial_reducer |> single |> stream_to_channel cluster channel_B);
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> reduce final_reducer)
+       end
+    in
+    {
+       fold = par_fold
+    }
+
+  let fair_distribute ipcdir size col =
+    let using_cluster m task = using_context (init m) term task in
+    let launch_bg n m task = fork_n n (task |> using_cluster m) in
+    let launch_fg   m task = using_cluster m task 0 in
+    let encode,decode = marshall_encoding in 
+    let stream_to_channel cluster name = map encode >> stream_to (fair_scatter cluster name) in
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
     let par_fold append merge seed =
        let partial_reducer = make_reducer seed append merge in

@@ -6,7 +6,7 @@ type ('a,'b,'c) red = {
   append: 'b -> 'a -> 'b;
   merge: 'b -> 'b -> 'b;
   result: 'b -> 'c;
-  absorber: 'b option;
+  maximum: ('b -> bool) option;
 }
 
 type 'a col = {
@@ -17,10 +17,11 @@ type 'a option_monoid = ('a, 'a option, 'a option) red
 type ('a,'b) col_monoid = ('a, 'b, 'a col) red
 
 let reduce red col =
-  let acc = match red.absorber with
+  let acc = match red.maximum with
   | None -> col.fold red.append red.merge red.empty
-  | Some(absorber) -> with_return (fun return ->
-    let append_or_return acc i = if acc = absorber then return acc else red.append acc i in
+  | Some(maximum) -> with_return (fun return ->
+    let append_or_return acc i = if maximum acc then return acc else red.append acc i in
+    let merge_or_return a b = let m = red.merge a b in if maximum m then return m else m in
     col.fold append_or_return red.merge red.empty
   )
   in red.result acc
@@ -98,7 +99,7 @@ let pair_reducer l_red r_red =
     append = split_append;
     merge = split_merge;
     result = pair_result;
-    absorber = None;
+    maximum = None;
   }
 
 let returning result reducer =
@@ -113,7 +114,7 @@ let monoid zero plus =
     append = plus;
     merge = plus;
     result = id;
-    absorber = None;
+    maximum = None;
   }
 
 let opt_monoid comb =
@@ -131,13 +132,19 @@ let opt_monoid comb =
     append = append;
     merge = merge;
     result = id;
-    absorber = None;
+    maximum = None;
   }
 
-let with_absorber absorber red =
+let with_maximum maximum red =
   {
     red with
-    absorber = Some(absorber)
+    maximum = Some(fun x -> x = maximum)
+  }
+
+let with_maximum_check maximum red =
+  {
+    red with
+    maximum = Some(maximum)
   }
 
 let col_monoid empty append merge collect =
@@ -146,7 +153,7 @@ let col_monoid empty append merge collect =
     append = append;
     merge = merge;
     result = collect;
-    absorber = None;
+    maximum = None;
   }
 
 

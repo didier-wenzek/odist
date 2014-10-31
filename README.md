@@ -136,9 +136,9 @@ Reducers are built around an associative binary operation with an identity eleme
 
 Reducers can be combined too:
 
-    let sum = monoid 0.0 (+.)
-    let count = sum |> mapping (fun _ -> 1.0)
-    let mean = pair_reducer sum count |> returning (fun (total,n) -> if n = 0.0 then 0.0 else total /. n)
+    let fsum = monoid 0.0 (+.)
+    let fcount = fsum |> mapping (fun _ -> 1.0)
+    let mean = pair_reducer fsum fcount |> returning (fun (total,n) -> if n = 0.0 then 0.0 else total /. n)
 
     list [1.2; 2.4; 3.6] |> reduce mean
 
@@ -146,6 +146,22 @@ Note that the type of `mean` reducer has type `(float, float * float, float) Odi
 - it accumulates `float` values
 - into a `(sum, count)` pair,
 - which is finally transformed into a `float` result.
+
+Early termination may be handled by reducers.
+For that a `maximum` value or checking function is attached to the reducer,
+so a reduce operation can be stop as soon as the accumulated value has reach a maximum
+(i.e a value which will not be changed by further accumulations).
+
+    let product = monoid 1 ( * ) |> with_maximum 0
+
+    range 0 1000000 |> reduce product
+    
+    let taking n reducer =
+      let max_count_reach (c,_) = c >= n in
+      let reduced_head (_,xs) = list xs |> reduce reducer in
+      pair_reducer count to_list |> with_maximum_check max_count_reach |> returning reduced_head
+
+    range 0 1000000 |> reduce (to_list |> tacking 10)
 
 Another way to reduce a collection is to stream its content to some effectfull device.
 

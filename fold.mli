@@ -16,7 +16,7 @@ type ('a,'b,'c) red = {
   append: 'b -> 'a -> 'b;
   merge: 'b -> 'b -> 'b;
   result: 'b -> 'c;
-  absorber: 'b option;
+  maximum: ('b -> bool) option;
 }
 (** A reducer abstracts a reduction operation :
   - it takes ['a] items,
@@ -46,7 +46,8 @@ val col_product: 'a col -> 'b col -> ('a -> 'b -> 'c) -> 'c col
 val monoid: 'a -> ('a -> 'a -> 'a) -> 'a monoid
 val opt_monoid: ('a -> 'a -> 'a) -> 'a option_monoid
 val col_monoid: 'a -> ('a -> 'b -> 'a) -> ('a -> 'a -> 'a) -> ('a -> 'c) -> ('b, 'a, 'c) red
-val with_absorber: 'b -> ('a,'b,'c) red -> ('a,'b,'c) red
+val with_maximum: 'b -> ('a,'b,'c) red -> ('a,'b,'c) red
+val with_maximum_check: ('b -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
 
 val mapping: ('a -> 'b) -> ('b,'c,'d) red -> ('a,'c,'d) red
 val flatmapping: ('a -> 'b col) -> ('b,'c,'d) red -> ('a,'c,'d) red

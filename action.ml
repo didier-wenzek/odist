@@ -27,7 +27,7 @@ let actor action =
     append = apply action.act;
     merge = and_then;
     result = term_with action.term;
-    absorber = None;
+    maximum = None;
   }
 
 let stream_to action col =

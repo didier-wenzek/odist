@@ -54,6 +54,12 @@ let _ =
   let s = range 1 1000000000 |> forall even in
   assert (not s);
 
+  let s = range 1 1000000000 |> reduce first in
+  assert (s = Some(1));
+
+  let s = range 1 1000000000 |> reduce (sum |> taking 5) in
+  assert (s = 15);
+
   let sumf = monoid 0.0 (+.) in
   let count = sumf |> mapping (fun _ -> 1.0) in
   let mean = pair_reducer sumf count |> returning (fun (total,n) -> if n = 0.0 then 0.0 else total /. n) in
@@ -72,4 +78,10 @@ let _ =
   let s_seq = range 1 100 |>                     sum_square_of_evens in
   assert (s_par = s_seq);
 
+  let chunk m i = range (m*i+1) (m*(i+1)) in
+  let par_range n m = range 0 (n-1) |> cores.distribute |> flatmap (chunk m) in
+  let seq_range n m = range 1 (n*m) in
+  let s_par = par_range 4 25 |> sum_square_of_evens in
+  let s_seq = seq_range 4 25 |> sum_square_of_evens in
+  assert (s_par = s_seq);
 
