@@ -95,7 +95,9 @@ module type MAP = sig
   include Map.S
 
   val grouping_with: ('a,'b,'b) red -> (key * 'a, 'b t, 'b t) red
-  val pairs: 'a t -> (key*'a) col
+  val grouping_by: ('a -> key) -> ('a,'b,'b) red -> ('a, 'b t, 'b t) red
+  val grouping: (key,'b,'b) red -> (key, 'b t, 'b t) red
+  val pairs: 'a t -> (key * 'a) col
 end
 
 module MapRed(M: Map.S) = struct
@@ -115,6 +117,9 @@ module MapRed(M: Map.S) = struct
       result = id;
       absorber = None;
     }
+
+  let grouping_by k reducer = red_map (fun x -> (k x,x)) (grouping_with reducer) 
+  let grouping reducer = red_map (fun x -> (x,x)) (grouping_with reducer)
 
   let pairs m =
     {

@@ -25,11 +25,21 @@ end
 module SetRed(S: Set.S) : SET with type t = S.t
 module MakeSetRed(E: Set.OrderedType) : SET with type elt = E.t
 
+(** Standart Map.S module with reducer and collection capabilities.*)
 module type MAP = sig
   include Map.S
 
+  (** Use a value reducer, to build a reducer of (key,value) pairs into a map where all values associated to a shared key are reduced. *)
   val grouping_with: ('a,'b,'b) red -> (key * 'a, 'b t, 'b t) red
-  val pairs: 'a t -> (key*'a) col
+
+  (** Use a key extractor and value reducer, to build a reducer of values into a map grouping and reducing values with a shared key. *)
+  val grouping_by: ('a -> key) -> ('a,'b,'b) red -> ('a, 'b t, 'b t) red
+
+  (** Use a key reducer, to build a reducer of keys into a map where all occurences of a keys are grouped and reduced. *)
+  val grouping: (key,'b,'b) red -> (key, 'b t, 'b t) red
+
+  (** The collection of all (key,value) pairs. *)
+  val pairs: 'a t -> (key * 'a) col
 end
 
 module MapRed(M: Map.S) : MAP 
