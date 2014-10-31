@@ -32,25 +32,44 @@ to local and distributed sets of files.
     let cores = Cluster.mcores 4
     files "." |> cores.distribute |> word_count
 
-For that all input datasets are abstracted by a single type `'a Odist.col`
+For that, all input datasets are abstracted by a single type `'a Odist.col`
 which values can be uniformaly manipulated
-whatever is their underlying data structure.
+whatever is the underlying data structure.
 
     range 1 100
     list [1;2;3;4;5]
     lines "/tmp/foo"
-    let par_range n m
 
     let sum_square_of_evens = filter even >> map square >> reduce sum
 
-    range 1 100 |> sum_square_of_evens
-    list [1;2;3;4;5] |> sum_square_of_evens
+    range 1 100                           |> sum_square_of_evens
+    range 1 100 |> cores.distribute       |> sum_square_of_evens
+    list [1;2;3;4;5]                      |> sum_square_of_evens
     lines "/tmp/foo" |> map int_of_string |> sum_square_of_evens
-    range 0 3 |> cores.distribute |> flatmap (fun i -> range 100*i 100*(i+1)-1) |> sum_square_of_evens
-
 
 Note the `list [1;2;3;4;5]` construct which wraps a regular OCaml list into an abstract `Odist.col`-lection.
 Similarly, `lines "/tmp/foo"` turns a file into a collection of strings.
+
+In a parallel or distributed setting (latter is not yet implemented),
+a former collection is broken into parts, one per computing unit.
+These parts are processed in parallel to produce result parts
+which has to be reduced in a final outcome.
+A key point is how the former dataset is distributed over computing units.
+
+    (* Sequential computation *)
+    (* 15.6 s on my desktop *)
+    let seq_range n m = range 1 (n*m)
+    seq_range 4 25000000 |> sum_square_of_evens
+
+    (* Sequential construction of the dataset, parallel computation. *)
+    (* 14.6 s on my desktop *)
+    seq_range 4 25000000 |> cores.distribute |> sum_square_of_evens
+
+    (* Parallel construction of the dataset and computation. *)
+    (* 4.6 s on my desktop. *)
+    let chunk m i = range (m*i+1) (m*(i+1))
+    let par_range n m = range 0 (n-1) |> cores.distribute |> flatmap (chunk m)
+    par_range 4 25 |> sum_square_of_evens
 
 Underneath, a collection is only indirectly defined by its ability to fold its content using
 - a function to inject one item into an aggregate,
