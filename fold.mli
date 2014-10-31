@@ -48,10 +48,10 @@ val opt_monoid: ('a -> 'a -> 'a) -> 'a option_monoid
 val col_monoid: 'a -> ('a -> 'b -> 'a) -> ('a -> 'a -> 'a) -> ('a -> 'c) -> ('b, 'a, 'c) red
 val with_absorber: 'b -> ('a,'b,'c) red -> ('a,'b,'c) red
 
-val red_map: ('a -> 'b) -> ('b,'c,'d) red -> ('a,'c,'d) red
-val red_flatmap: ('a -> 'b col) -> ('b,'c,'d) red -> ('a,'c,'d) red
-val red_unnest: ('a -> 'b col) -> ('a*'b,'c,'d) red -> ('a,'c,'d) red
-val red_filter: ('a -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
+val mapping: ('a -> 'b) -> ('b,'c,'d) red -> ('a,'c,'d) red
+val flatmapping: ('a -> 'b col) -> ('b,'c,'d) red -> ('a,'c,'d) red
+val unnesting: ('a -> 'b col) -> ('a*'b,'c,'d) red -> ('a,'c,'d) red
+val filtering: ('a -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
 val red_product: ('a,'b,'c) red -> ('a,'d,'e) red -> ('c -> 'e -> 'f) -> ('a, 'b*'d, 'f) red
 
 type ('a,'b) col_monoid = ('a, 'b, 'a col) red

@@ -63,31 +63,31 @@ let col_product l_col r_col pair =
     fold = fold
   }
  
-let red_map f red =
+let mapping f red =
   {
     red with
     append = comb_map f red.append
   }
 
-let red_filter p red =
+let filtering p red =
   {
     red with
     append = comb_filter p red.append
   }
 
-let red_flatmap f red =
+let flatmapping f red =
   {
     red with
     append = comb_flatmap f red.append red.merge
   }
 
-let red_unnest f red =
+let unnesting f red =
   {
     red with
     append = comb_unnest f red.append red.merge
   }
 
-let fold f red = reduce (red_map f red)
+let fold f red = reduce (mapping f red)
 
 let red_product l_red r_red pair =
   let split_append (l_acc, r_acc) item = (l_red.append l_acc item, r_red.append r_acc item) in

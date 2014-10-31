@@ -118,8 +118,8 @@ module MapRed(M: Map.S) = struct
       absorber = None;
     }
 
-  let grouping_by k reducer = red_map (fun x -> (k x,x)) (grouping_with reducer) 
-  let grouping reducer = red_map (fun x -> (x,x)) (grouping_with reducer)
+  let grouping_by k reducer = mapping (fun x -> (k x,x)) (grouping_with reducer) 
+  let grouping reducer = mapping (fun x -> (x,x)) (grouping_with reducer)
 
   let pairs m =
     {
@@ -163,7 +163,7 @@ module NumRed(N: NUM) = struct
     absorber = None;
   }
 
-  let square_sum = red_map (fun x -> N.mul x x) sum
+  let square_sum = mapping (fun x -> N.mul x x) sum
 end
 
 module CamlInt = struct
