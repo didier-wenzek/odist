@@ -54,6 +54,12 @@ let _ =
   let s = range 1 1000000000 |> forall even in
   assert (not s);
 
+  let sumf = monoid 0.0 (+.) in
+  let count = sumf |> mapping (fun _ -> 1.0) in
+  let mean = pair_reducer sumf count |> returning (fun (total,n) -> if n = 0.0 then 0.0 else total /. n) in
+  let m = list [1.2; 2.4; 3.6] |> reduce mean in
+  assert (m = 2.4);
+
   let s = range 0 9 |> map string_of_int |> stream_to (string_buffer 16) in
   assert ( s = "0123456789");
 

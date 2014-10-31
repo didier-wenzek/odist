@@ -89,16 +89,22 @@ let unnesting f red =
 
 let fold f red = reduce (mapping f red)
 
-let red_product l_red r_red pair =
+let pair_reducer l_red r_red =
   let split_append (l_acc, r_acc) item = (l_red.append l_acc item, r_red.append r_acc item) in
   let split_merge (l1, r1) (l2, r2) = (l_red.merge l1 l2, r_red.merge r1 r2) in
-  let pair_result (l,r) = pair (l_red.result l) (r_red.result r) in
+  let pair_result (l,r) = ((l_red.result l),(r_red.result r)) in
   {
     empty = (l_red.empty, r_red.empty);
     append = split_append;
     merge = split_merge;
     result = pair_result;
     absorber = None;
+  }
+
+let returning result reducer =
+  {
+     reducer with
+     result = reducer.result >> result
   }
 
 let monoid zero plus =

@@ -52,6 +52,7 @@ val mapping: ('a -> 'b) -> ('b,'c,'d) red -> ('a,'c,'d) red
 val flatmapping: ('a -> 'b col) -> ('b,'c,'d) red -> ('a,'c,'d) red
 val unnesting: ('a -> 'b col) -> ('a*'b,'c,'d) red -> ('a,'c,'d) red
 val filtering: ('a -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
-val red_product: ('a,'b,'c) red -> ('a,'d,'e) red -> ('c -> 'e -> 'f) -> ('a, 'b*'d, 'f) red
+val pair_reducer: ('a,'b,'c) red -> ('a,'d,'e) red -> ('a, 'b*'d, 'c*'e) red
+val returning: ('c -> 'd) -> ('a,'b,'c) red -> ('a,'b,'d) red
 
 type ('a,'b) col_monoid = ('a, 'b, 'a col) red

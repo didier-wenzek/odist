@@ -12,29 +12,53 @@ The core of ODist is dataset processing :
 
     range 1 100 |> filter even |> map square |> reduce sum
 
-All input datasets are abstracted by a single type `'a Odist.col`
+The aim of ODist is to abstract data processing in such a way
+that processing a distributed dataset can be done
+using the same processing pipeline as a local dataset.
+For instance, counting the occurrences of each word in a list of files
+can be defined as a `word_count` function which can be indifferently applied 
+to local and distributed sets of files.
+
+    module StrMap = MakeMapRed(String)
+    let grouping = StrMap.grouping
+    let count = sum |> mapping (fun x -> 1)
+    
+    let word_count = flatmap words >> reduce (grouping count)
+
+    (* Count words of all files in the working directory. *)
+    files "." |> word_count
+
+    (* Use 4 process to count words. *)
+    let cores = Cluster.mcores 4
+    files "." |> cores.distribute |> word_count
+
+For that all input datasets are abstracted by a single type `'a Odist.col`
 which values can be uniformaly manipulated
-whatever their underlying data structure.
+whatever is their underlying data structure.
 
     range 1 100
     list [1;2;3;4;5]
     lines "/tmp/foo"
+    let par_range n m
 
     let sum_square_of_evens = filter even >> map square >> reduce sum
 
     range 1 100 |> sum_square_of_evens
     list [1;2;3;4;5] |> sum_square_of_evens
     lines "/tmp/foo" |> map int_of_string |> sum_square_of_evens
+    range 0 3 |> cores.distribute |> flatmap (fun i -> range 100*i 100*(i+1)-1) |> sum_square_of_evens
 
-Note the `list [1;2;3;4;5]` construct which wraps a regular OCaml list into an abstract `Odist.col`-lection;
-and, similarly, the `lines "/tmp/foo"` call which turns a file into a collection of strings.
+
+Note the `list [1;2;3;4;5]` construct which wraps a regular OCaml list into an abstract `Odist.col`-lection.
+Similarly, `lines "/tmp/foo"` turns a file into a collection of strings.
 
 Underneath, a collection is only indirectly defined by its ability to fold its content using
 - a function to inject one item into an aggregate,
 - a function to merge two aggregates,
 - an initial aggregate.
 
-
+A collection of `'a` has type:
+     
     type 'a col = {
       fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
     }
@@ -63,7 +87,9 @@ The result is a dataset, so transformations can be chained.
     filter: ('a -> bool) -> 'a Odist.col -> 'a Odist.col
     flatmap: ('a -> 'b Odist.col) -> 'a Odist.col -> 'b Odist.col
     
-    files "." |> flatmap words |> map String.lowercase |> filter (fun w -> (String.get w 0) = 'a')
+    let lowercase = String.lowercase
+    let stopword w = Set.mem w stopwords
+    files "." |> flatmap words |> map lowercase |> filter stopword
 
 Note that these transformations are lazy: they are only performed when the dataset is actually reduced into some aggregate. For instance, underneath a mapped collection simply waits for a call to the `fold` function to transform the given `append` argument and to forward the call to the former collection.
 
@@ -91,16 +117,18 @@ Reducers are built around an associative binary operation with an identity eleme
 
 Reducers can be combined too:
 
-    let count = red_map (fun _ -> 1) sum
+    let sum = monoid 0.0 (+.)
+    let count = sum |> mapping (fun _ -> 1.0)
+    let mean = pair_reducer sum count |> returning (fun (total,n) -> if n = 0.0 then 0.0 else total /. n)
 
-    let sum_float = monoid 0.0 (+.)
-    let mean = red_product sum_float count (fun s c -> s /. (float_of_int c))
+    list [1.2; 2.4; 3.6] |> reduce mean
 
-    lines "/tmp/bar" |> map float_of_string |> reduce mean
+Note that the type of `mean` reducer has type `(float, float * float, float) Odist.red`:
+- it accumulates `float` values
+- into a `(sum, count)` pair,
+- which is finally transformed into a `float` result.
 
-Note that the type of `mean` is `(float, float * int, float) Odist.red`: the accumulated values are `(sum, count)` pairs which can only be translated into a result when the reduction is fully done. Hence the `result` function of any reducer. In the `mean` reducer case, the `result` of a final `(sum, count)` pair is simply the `sum` divided by the `count`.
-
-Another way a collection can be reduced is by streaming its content to some effectfull device.
+Another way to reduce a collection is to stream its content to some effectfull device.
 
     list ["foo";"bar"] |> stream_to (file_printer "/tmp/foo")
 
