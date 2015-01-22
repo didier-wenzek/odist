@@ -137,18 +137,6 @@ let fold_file_chunks size path comb seed =
   in try loop seed
      with  error -> close_in channel; raise error
 
-(* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
-let fold_file_chunks size path comb seed =
-  let channel = open_in path in
-  let buffer = String.create size in
-  let rec loop acc =
-    let l = input channel buffer 0 size in
-    if l = 0
-    then (close_in channel; acc)
-    else loop (comb acc (String.sub buffer 0 l))
-  in try loop seed
-     with  error -> close_in channel; raise error
-
 let file_chunks size path =
   let fold append _ seed = fold_file_chunks size path append seed in
   {
@@ -168,9 +156,9 @@ let string_chars str start len comb seed =
 (* [file_characters path comb seed] combines all characters of the file with the given [path]. *)
 let file_characters path comb seed =
   let channel = open_in path in
-  let buffer = String.create 81920 in
+  let buffer = String.create 8192 in
   let rec loop acc =
-    let l = input channel buffer 0 81920 in
+    let l = input channel buffer 0 8192 in
     if l = 0
     then (close_in channel; acc)
     else loop (string_chars buffer 0 l comb acc)
