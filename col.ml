@@ -2,34 +2,34 @@ open Unix
 open Fold
 
 let empty = {
-    fold = (fun _ _ e -> e);
+    fold = (fun _ e -> e);
   }
 
 let single x = {
-    fold = (fun append _ e -> append e x);
+    fold = (fun red e -> red.append e x);
   }
 
 let cons x xs = {
-   fold = (fun append concat seed -> xs.fold append concat (append seed x));
+   fold = (fun red seed -> xs.fold red (red.append seed x));
 }
 
 let append xs x = {
-    fold = (fun append concat e -> append (xs.fold append concat e) x);
+    fold = (fun red e -> red.append (xs.fold red e) x);
   }
 
 let concat xs ys = {
-    fold = (fun append concat e -> ys.fold append concat (xs.fold append concat e));
+    fold = (fun red e -> ys.fold red (xs.fold red e));
   }
 
 let of_list xs =
-  let fold append _ acc = List.fold_left append acc xs in
+  let fold red acc = List.fold_left red.append acc xs in
   {
     fold = fold;
   }
 
 let of_range min max =
-  let fold append _ acc =
-    let rec loop a i = if i>max then a else loop (append a i) (i+1)
+  let fold red acc =
+    let rec loop a i = if i>max then a else loop (red.append a i) (i+1)
     in loop acc min
   in
   {
@@ -80,12 +80,12 @@ let foldfiles comb seed path =
 let of_files ?(recursive = true) path = 
   if recursive
   then
-    let fold append _ seed = recfoldfiles append seed path in
+    let fold red seed = recfoldfiles red.append seed path in
     {
       fold = fold
     }
   else
-    let fold append _ seed = foldfiles append seed path in
+    let fold red seed = foldfiles red.append seed path in
     {
       fold = fold
     }
@@ -115,12 +115,12 @@ let foldsubdirs comb seed path =
 let of_subdirs ?(recursive = true) path = 
   if recursive
   then
-    let fold append _ seed = recfoldsubdirs append seed path in
+    let fold red seed = recfoldsubdirs red.append seed path in
     {
       fold = fold
     }
   else
-    let fold append _ seed = foldsubdirs append seed path in
+    let fold red seed = foldsubdirs red.append seed path in
     {
       fold = fold
     }
@@ -138,7 +138,7 @@ let fold_file_chunks size path comb seed =
      with  error -> close_in channel; raise error
 
 let of_file_chunks size path =
-  let fold append _ seed = fold_file_chunks size path append seed in
+  let fold red seed = fold_file_chunks size path red.append seed in
   {
     fold = fold
   }
@@ -166,7 +166,7 @@ let file_characters path comb seed =
      with  error -> close_in channel; raise error
 
 let of_file_chars path =
-  let fold append _ seed = file_characters path append seed in
+  let fold red seed = file_characters path red.append seed in
   {
     fold = fold
 }
@@ -199,14 +199,14 @@ let tokens is_sep file comb seed =
 (* [words path comb seed] iterates over all words of the file with the given [path]. *)
 let of_file_words path =
   let sep c = not (isalpha c) in
-  let fold append _ = tokens sep path append in
+  let fold red = tokens sep path red.append in
   {
     fold = fold
   }
 
 let of_file_lines path =
   let sep c = c = '\n' in
-  let fold append _ seed = tokens sep path append seed in
+  let fold red seed = tokens sep path red.append seed in
   {
     fold = fold
   }

@@ -24,11 +24,11 @@ let fork_n n task =
 
 let marshall_encoding = ((fun a -> Marshal.to_string a []), (fun s -> Marshal.from_string s 0))
 
-let make_reducer empty append merge =
+let union_reducer red =
   {
-    empty = empty;
-    append = append;
-    merge = merge;
+    empty = red.empty;
+    append = red.merge;
+    merge = red.merge;
     result = id;
     maximum = None;
   }
@@ -174,7 +174,7 @@ end = struct
        with error -> Zmq.close infan; raise error
   
   let gather cluster channel_name =
-    let fold append _ acc = gather_fold cluster channel_name append acc in
+    let fold red acc = gather_fold cluster channel_name red.append acc in
     {
       fold = fold;
     }
@@ -202,7 +202,11 @@ end = struct
     }
   
   let ignore_order node_msg_pairs =
-    let fold append = node_msg_pairs.fold (fun acc (_,msg) -> append acc msg) in
+    let ignoring_order red = { red with
+      append = (fun acc (_,msg) -> red.append acc msg);
+    }
+    in
+    let fold red = node_msg_pairs.fold (ignoring_order red) in
     {
        fold = fold
     }
@@ -214,9 +218,9 @@ end = struct
     let encode,decode = marshall_encoding in 
     let stream_to_channel cluster name = stream (scatter cluster name |> encoding_with encode |> using_roundrobin) in
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
-    let par_fold append merge seed =
-       let partial_reducer = make_reducer seed append merge in
-       let final_reducer = make_reducer seed merge merge in
+    let par_fold red seed =
+       let partial_reducer = red in
+       let final_reducer = union_reducer red in
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
@@ -236,9 +240,9 @@ end = struct
     let encode,decode = marshall_encoding in 
     let stream_to_channel cluster name = map encode >> stream (fair_scatter cluster name) in
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
-    let par_fold append merge seed =
-       let partial_reducer = make_reducer seed append merge in
-       let final_reducer = make_reducer seed merge merge in
+    let par_fold red seed =
+       let partial_reducer = red in
+       let final_reducer = union_reducer red in
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin

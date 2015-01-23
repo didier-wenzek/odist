@@ -94,7 +94,7 @@ module SetRed(S: Set.S) = struct
 
   let items xs =
   {
-     fold = (fun append _ acc -> S.fold (fun x xs -> append xs x) xs acc);
+     fold = (fun red acc -> S.fold (fun x xs -> red.append xs x) xs acc);
   }
 end
 
@@ -132,7 +132,7 @@ module MapRed(M: Map.S) = struct
 
   let pairs m =
     {
-      fold = (fun append _ acc -> M.fold (fun k v acc -> append acc (k,v)) m acc);
+      fold = (fun red acc -> M.fold (fun k v acc -> red.append acc (k,v)) m acc);
     }
 end
 

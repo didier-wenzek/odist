@@ -42,9 +42,9 @@ whatever is the underlying data structure.
 
     let sum_square_of_evens = filter even >> map square >> reduce sum
 
-    Col.of_range 1 100                           |> sum_square_of_evens
-    Col.of_range 1 100 |> cores.distribute       |> sum_square_of_evens
-    Col.of_list [1;2;3;4;5]                      |> sum_square_of_evens
+    Col.of_range 1 100                                |> sum_square_of_evens
+    Col.of_range 1 100           |> cores.distribute  |> sum_square_of_evens
+    Col.of_list [1;2;3;4;5]                           |> sum_square_of_evens
     Col.of_file_lines "/tmp/foo" |> map int_of_string |> sum_square_of_evens
 
 Note the `Col.of_list [1;2;3;4;5]` construct which wraps a regular OCaml list into an abstract `Odist.col`-lection.
@@ -69,35 +69,54 @@ A key point is how the former dataset is distributed over computing units.
     (* 4.6 s on my desktop. *)
     let chunk m i = Col.of_range (m*i+1) (m*(i+1))
     let par_range n m = Col.of_range 0 (n-1) |> cores.distribute |> flatmap (chunk m)
-    par_range 4 25 |> sum_square_of_evens
+    par_range 4 25000000 |> sum_square_of_evens
 
-Underneath, a collection is only indirectly defined by its ability to fold its content using
+Underneath, two abstractions hand by hand : collections and reducers.
+Collections provide the content and reducers the rules to fold this content.
+Hence a collection is only defined by the ability to fold its content using a reducer which provides:
+- an empty aggregate,
 - a function to inject one item into an aggregate,
 - a function to merge two aggregates,
-- an initial aggregate.
+- a function to build a final outcome from an aggregate
+- and an optional function, aimed to check if the aggregate has reach some maximum value, in which case its useless to aggregate more items.
 
 A collection of `'a` has type:
      
     type 'a col = {
-      fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
+      fold: 'b 'c. ('a,'b,'c) red -> 'b  -> 'b;
     }
 
-For instance, we can implement a collection using a tree of nested lists as representation:
+A reducer of type `('a,'b,'c) red` gives the rules to pack item of type `'a` into some `'b` aggregate leading to some `'c` outcome.
+
+    type ('a,'b,'c) red = {
+      empty: 'b;
+      append: 'b -> 'a -> 'b;
+      merge: 'b -> 'b -> 'b; 
+      result: 'b -> 'c;
+      maximum: ('b -> bool) option; 
+    }
+    
+For instance, we can implement a collection using a tree of nested lists:
 
     type 'a nested_list = L of 'a list | N of 'a nested_list list
-    let fold_nested_list append merge empty =
-        let rec fold l = match l with
-        | L xs -> List.fold_left append empty xs
-        | N xxs -> List.fold_left (fun a xs -> merge a (fold xs)) empty xxs
-        in fold
-
+    
+    let fold_nested_list red =
+        let rec fold acc l = match l with
+        | L xs -> List.fold_left red.append acc xs
+        | N xxs -> List.fold_left (fun a xs -> red.merge a (fold red.empty xs)) acc xxs
+        in fold 
+        
     let nested_list xs =
-       let foldxs append merge empty = fold_nested_list append merge empty xs in
-       {
-          fold = foldxs
-       }
+    {
+      fold = (fun red acc -> fold_nested_list red acc xs);
+    }  
 
-    nested_list (N [L [1;2;3]; L[4;5;6;7]; N [ L[]; L[8;9] ]]) |> reduce to_list
+Any collection of `'a` items can be reduced using any reducer of `'a` items:
+
+    reduce: ('a,'b,'c) red -> 'a col -> 'c
+
+    let l = nested_list (N [L [1;2;3]; L[4;5;6;7]; N [ L[]; L[8;9] ]]) |> reduce to_list
+    assert (l = [1;2;3;4;5;6;7;8;9])
 
 Then come dataset manipulators which take a dataset and transform it, removing, changing, adding items.
 The result is a dataset, so transformations can be chained.
@@ -117,14 +136,6 @@ Note that these transformations are lazy: they are only performed when the datas
       {
         fold = (fun append merge seed -> col.fold (transform append) merge seed);
       }
-
-
-Reductions are driven by reducers which provide the arguments required by a collection to be folded.
-A reducer of type `(item, aggregate, outcome) Fold.red` reduces a collection of `item` into an `aggregate` and than into a final `outcome`. It provides:
-- an `empty` initial aggregate,
-- an `append` function aimed to inject one item into an aggregate,
-- a `merge` function aimed to merge two aggregates,
-- a `result` function which transform an aggregate into a final outcome.
 
 Reducers are built around an associative binary operation with an identity element (*a.k.a. a monoid*).
 

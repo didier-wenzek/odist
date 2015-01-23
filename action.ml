@@ -33,7 +33,7 @@ let actor action =
 let stream action col =
   let actor = actor action in
   let state = State (action.init ()) in
-  try actor.result (col.fold actor.append actor.merge state)
+  try actor.result (col.fold actor state)
   with e -> actor.result state; raise e
 
 let to_printer = {

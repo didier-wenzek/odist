@@ -1,16 +1,5 @@
 (** Abstraction of dataset processing using union fold. *)
 
-type 'a col = {
-  fold: 'b. ('b -> 'a -> 'b) -> ('b -> 'b -> 'b) -> 'b  -> 'b;
-}
-(** Collection type.
-
-  A dataset is only defined indirectly by the ability to fold its content into an aggregate using
-  - an empty initial aggregate,
-  - a function to inject one item into an aggregate,
-  - a function to merge two aggregates.
-*)
-
 type ('a,'b,'c) red = {
   empty: 'b;
   append: 'b -> 'a -> 'b;
@@ -19,9 +8,20 @@ type ('a,'b,'c) red = {
   maximum: ('b -> bool) option;
 }
 (** A reducer abstracts a reduction operation :
-  - it takes ['a] items,
-  - it aggregates these items into some ['b] value,
-  - it builds a final ['c] value from the aggregate.
+  - over a stream of ['a] items,
+  - which are aggregated into some ['b] value,
+  - used to build a final outcome ['c].
+*)
+
+type 'a col = {
+  fold: 'b 'c. ('a,'b,'c) red -> 'b  -> 'b;
+}
+(** Collection type.
+
+  A dataset is only defined indirectly by the ability to fold its content into an aggregate using
+  - an empty initial aggregate,
+  - a function to inject one item into an aggregate,
+  - a function to merge two aggregates.
 *)
 
 type 'a monoid = ('a,'a,'a) red

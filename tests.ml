@@ -7,16 +7,15 @@ let sum = monoid 0 (+)
 let sum_square_of_evens = filter even >> map square >> reduce sum
 
 type 'a nested_list = L of 'a list | N of 'a nested_list list
-let fold_nested_list append merge empty =
-    let rec fold l = match l with
-    | L xs -> List.fold_left append empty xs
-    | N xxs -> List.fold_left (fun a xs -> merge a (fold xs)) empty xxs
+let fold_nested_list red =
+    let rec fold acc l = match l with
+    | L xs -> List.fold_left red.append acc xs
+    | N xxs -> List.fold_left (fun a xs -> red.merge a (fold red.empty xs)) acc xxs
     in fold
 
 let nested_list xs =
-    let foldxs append merge empty = fold_nested_list append merge empty xs in
     {
-      fold = foldxs
+      fold = (fun red acc -> fold_nested_list red acc xs);
     }
 
 module S = MakeSetRed(struct
