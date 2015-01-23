@@ -21,13 +21,13 @@ let concat xs ys = {
     fold = (fun append concat e -> ys.fold append concat (xs.fold append concat e));
   }
 
-let list xs =
+let of_list xs =
   let fold append _ acc = List.fold_left append acc xs in
   {
     fold = fold;
   }
 
-let range min max =
+let of_range min max =
   let fold append _ acc =
     let rec loop a i = if i>max then a else loop (append a i) (i+1)
     in loop acc min
@@ -77,7 +77,7 @@ let foldfiles comb seed path =
     with _ -> ()
   in combfiles path; !acc
 
-let files ?(recursive = true) path = 
+let of_files ?(recursive = true) path = 
   if recursive
   then
     let fold append _ seed = recfoldfiles append seed path in
@@ -112,7 +112,7 @@ let foldsubdirs comb seed path =
     with _ -> ()
   in iterdir combfiles path; !acc
 
-let subdirs ?(recursive = true) path = 
+let of_subdirs ?(recursive = true) path = 
   if recursive
   then
     let fold append _ seed = recfoldsubdirs append seed path in
@@ -137,7 +137,7 @@ let fold_file_chunks size path comb seed =
   in try loop seed
      with  error -> close_in channel; raise error
 
-let file_chunks size path =
+let of_file_chunks size path =
   let fold append _ seed = fold_file_chunks size path append seed in
   {
     fold = fold
@@ -165,7 +165,7 @@ let file_characters path comb seed =
   in try loop seed
      with  error -> close_in channel; raise error
 
-let file path =
+let of_file_chars path =
   let fold append _ seed = file_characters path append seed in
   {
     fold = fold
@@ -197,14 +197,14 @@ let tokens is_sep file comb seed =
   newterm (file_characters file newcomb newseed)
 
 (* [words path comb seed] iterates over all words of the file with the given [path]. *)
-let words path =
+let of_file_words path =
   let sep c = not (isalpha c) in
   let fold append _ = tokens sep path append in
   {
     fold = fold
   }
 
-let lines path =
+let of_file_lines path =
   let sep c = c = '\n' in
   let fold append _ seed = tokens sep path append seed in
   {

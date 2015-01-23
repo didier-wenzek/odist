@@ -89,7 +89,7 @@ end = struct
   
   type outfan = Zmq.socket array
 
-  let node_set cluster = range 0 (cluster.size - 1) |> reduce NodeSet.union_reducer
+  let node_set cluster = Col.of_range 0 (cluster.size - 1) |> reduce NodeSet.union_reducer
   
   let init size this_node = {
      context = Zmq.ctx_new ();
@@ -146,7 +146,7 @@ end = struct
     } in
     let push msg outfan = send cluster.this_node msg outfan;outfan in
     {
-       init = (fun () -> range 0 (cluster.size -1) |> stream_to outfan_connector);
+       init = (fun () -> Col.of_range 0 (cluster.size -1) |> stream_to outfan_connector);
        act = push;
        term = close cluster.this_node;
     }
