@@ -30,25 +30,25 @@ let actor action =
     maximum = None;
   }
 
-let stream_to action col =
+let stream action col =
   let actor = actor action in
   let state = State (action.init ()) in
   try actor.result (col.fold actor.append actor.merge state)
   with e -> actor.result state; raise e
 
-let printer = {
+let to_printer = {
   init = (fun () -> ());
   act = (fun s () -> print_string s);
   term = (fun () -> ());
 }
 
-let file_printer file = {
+let to_file_printer file = {
   init = (fun () -> open_out file);
   act = (fun s out -> output_string out s; out);
   term = close_out;
 }
 
-let string_buffer size =
+let to_string_buffer size =
   {
     init = (fun () -> Buffer.create size);
     act = (fun str buf -> Buffer.add_string buf str; buf);

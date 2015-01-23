@@ -138,7 +138,9 @@ Reducers can be combined too:
 
     let fsum = monoid 0.0 (+.)
     let fcount = fsum |> mapping (fun _ -> 1.0)
-    let mean = pair_reducer fsum fcount |> returning (fun (total,n) -> if n = 0.0 then 0.0 else total /. n)
+    let mean = pair_reducer fsum fcount |> returning (
+      fun (total,n) -> if n = 0.0 then 0.0 else total /. n
+    )
 
     Col.of_list [1.2; 2.4; 3.6] |> reduce mean
 

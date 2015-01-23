@@ -66,10 +66,10 @@ let _ =
   let m = Col.of_list [1.2; 2.4; 3.6] |> reduce mean in
   assert (m = 2.4);
 
-  let s = Col.of_range 0 9 |> map string_of_int |> stream_to (string_buffer 16) in
+  let s = Col.of_range 0 9 |> map string_of_int |> stream (to_string_buffer 16) in
   assert ( s = "0123456789");
 
-  Col.of_range 1 100 |> map string_of_int |> flatmap (fun s -> Col.of_list [s;"\n"]) |> stream_to (file_printer "/tmp/foo");
+  Col.of_range 1 100 |> map string_of_int |> flatmap (fun s -> Col.of_list [s;"\n"]) |> stream (to_file_printer "/tmp/foo");
   let s = Col.of_file_lines "/tmp/foo" |> map int_of_string |> reduce sum in
   assert (s = 50 * 101 );
 

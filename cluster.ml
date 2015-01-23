@@ -139,14 +139,14 @@ end = struct
       let channel = ipc_channel channel_name (string_of_int point) in 
       Zmq.connect outfan channel; outfan
     in
-    let outfan_connector = {
+    let to_outfan_connector = {
       init = (fun () -> Zmq.socket cluster.context Zmq.PUSH);
       act = connect_outfan;
       term = id;
     } in
     let push msg outfan = send cluster.this_node msg outfan;outfan in
     {
-       init = (fun () -> Col.of_range 0 (cluster.size -1) |> stream_to outfan_connector);
+       init = (fun () -> Col.of_range 0 (cluster.size -1) |> stream to_outfan_connector);
        act = push;
        term = close cluster.this_node;
     }
@@ -212,7 +212,7 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = stream_to (scatter cluster name |> encoding_with encode |> using_roundrobin) in
+    let stream_to_channel cluster name = stream (scatter cluster name |> encoding_with encode |> using_roundrobin) in
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
     let par_fold append merge seed =
        let partial_reducer = make_reducer seed append merge in
@@ -234,7 +234,7 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = map encode >> stream_to (fair_scatter cluster name) in
+    let stream_to_channel cluster name = map encode >> stream (fair_scatter cluster name) in
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
     let par_fold append merge seed =
        let partial_reducer = make_reducer seed append merge in
