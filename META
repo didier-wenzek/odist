@@ -1,6 +1,7 @@
 name="odist"
 version="0.1.0"
 description="multi-nodes and multi-cores dataset processing"
-requires=""
+requires="unix num ozmq"
 archive(byte) = "odist.cma"
 archive(native) = "odist.cmxa"
+

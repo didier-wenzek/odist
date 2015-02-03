@@ -1,23 +1,28 @@
 NAME = odist
 DOC = odist.docdir/index.html
-TARGETS = odist.cma odist.cmxa odist.cmi odist.a
+MODULES = infix fold red col text action cluster util
+CMI = $(addsuffix .cmi, $(MODULES))
+TARGETS = odist.cma odist.cmxa odist.cmi odist.a $(CMI)
 LIB = $(addprefix _build/, $(TARGETS)) 
 INSTALL = $(LIB)
 
 all:
-	ocamlbuild $(TARGETS)
+	ocamlbuild -use-ocamlfind $(TARGETS)
 
 doc:
 	ocamlbuild $(DOC)
 
 tests:
-	ocamlbuild -libs unix,nums,ozmq -lflags -cclib,-lzmq tests.native --
+	ocamlbuild -use-ocamlfind -lflags -cclib,-lzmq tests.native --
 	_build/tests.native
 
 install: all
 	ocamlfind install $(NAME) META $(INSTALL)
 
+uninstall:
+	ocamlfind remove $(NAME) 
+
 clean:
 	ocamlbuild -clean
 
-.PHONY: all clean doc tests
+.PHONY: all clean doc tests install uninstall
