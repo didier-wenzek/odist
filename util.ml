@@ -4,12 +4,17 @@
     and returns the value of [f context].
 
     [val using_context : ('arg -> 'ctx) -> ('ctx -> 'unit) -> ('ctx -> 'res) -> 'arg -> 'res]
+
+    Adapted from http://stackoverflow.com/questions/11276985/emulating-try-with-finally-in-ocaml.
 *)
 let using_context init term task arg =
+  let module E = struct type 'a t = Left of 'a | Right of exn end in
   let ctx = init arg in
-  try let result = task ctx in term ctx; result
-  with error -> term ctx; raise error
-  
+  let res = try E.Left (task ctx) with e -> E.Right e in
+  let _ = term ctx in
+  match res with
+  | E.Left  r -> r
+  | E.Right e -> raise e
 
 (* Function that lets you return early from a computation.
    Adapted from Alan Frish's version of https://ocaml.janestreet.com/?q=node/91,
