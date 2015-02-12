@@ -29,10 +29,6 @@ type 'a monoid = ('a,'a,'a) red
   It is built around an associative operation with an identity.
 *)
 
-type 'a option_monoid = ('a, 'a option, 'a option) red
-(**
-*)
-
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'b,'c) red -> 'a col -> 'c
 val fold: ('a -> 'b) -> ('b,'c,'d) red -> 'a col -> 'd
@@ -44,7 +40,7 @@ val filter: ('a -> bool) -> 'a col -> 'a col
 val col_product: 'a col -> 'b col -> ('a -> 'b -> 'c) -> 'c col
 
 val monoid: 'a -> ('a -> 'a -> 'a) -> 'a monoid
-val opt_monoid: ('a -> 'a -> 'a) -> 'a option_monoid
+val opt_monoid: ('a -> 'a -> 'a) -> ('a, 'a option, 'a option) red
 val col_monoid: 'a -> ('a -> 'b -> 'a) -> ('a -> 'a -> 'a) -> ('a -> 'c) -> ('b, 'a, 'c) red
 val with_maximum: 'b -> ('a,'b,'c) red -> ('a,'b,'c) red
 val with_maximum_check: ('b -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
@@ -55,5 +51,3 @@ val unnesting: ('a -> 'b col) -> ('a*'b,'c,'d) red -> ('a,'c,'d) red
 val filtering: ('a -> bool) -> ('a,'b,'c) red -> ('a,'b,'c) red
 val pair_reducer: ('a,'b,'c) red -> ('a,'d,'e) red -> ('a, 'b*'d, 'c*'e) red
 val returning: ('c -> 'd) -> ('a,'b,'c) red -> ('a,'b,'d) red
-
-type ('a,'b) col_monoid = ('a, 'b, 'a col) red

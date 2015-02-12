@@ -13,8 +13,6 @@ type 'a col = {
   fold: 'b 'c. ('a,'b,'c) red -> 'b  -> 'b;
 }
 type 'a monoid = ('a,'a,'a) red
-type 'a option_monoid = ('a, 'a option, 'a option) red
-type ('a,'b) col_monoid = ('a, 'b, 'a col) red
 
 let reduce red col =
   let acc = match red.maximum with
