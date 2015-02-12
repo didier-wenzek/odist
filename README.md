@@ -89,7 +89,7 @@ A collection of `'a` has type:
 A reducer of type `('a,'b,'c) red` gives the rules to pack item of type `'a` into some `'b` aggregate leading to some `'c` outcome.
 
     type ('a,'b,'c) red = {
-      empty: 'b;
+      empty: unit -> 'b;
       append: 'b -> 'a -> 'b;
       merge: 'b -> 'b -> 'b; 
       result: 'b -> 'c;
@@ -103,7 +103,7 @@ For instance, we can implement a collection using a tree of nested lists:
     let fold_nested_list red =
         let rec fold acc l = match l with
         | L xs -> List.fold_left red.append acc xs
-        | N xxs -> List.fold_left (fun a xs -> red.merge a (fold red.empty xs)) acc xxs
+        | N xxs -> List.fold_left (fun acc xs -> fold acc xs) acc xxs
         in fold 
         
     let nested_list xs =

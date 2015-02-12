@@ -24,7 +24,7 @@ let pack_split_reducer split reducer =
     match split str with
     | [] -> empty
     | left::tail -> (
-      let middle,oright = fold_all_but_last reducer.append reducer.empty tail in
+      let middle,oright = fold_all_but_last reducer.append (reducer.empty ()) tail in
       match oright with
       | None -> S(left)
       | Some(right) -> B(left,middle,right)
@@ -44,7 +44,7 @@ let pack_split_reducer split reducer =
     | S(s) -> B(la, ma,s)
     | B(sl,sm,sr) -> B(la, merge3 ma sl sm, sr)
   in
-  let reducer_single item = reducer.append reducer.empty item in
+  let reducer_single item = reducer.append (reducer.empty ()) item in
   let reducer_prepend item items = reducer.merge (reducer_single item) items in
   let merge a b = match (a,b) with
     | S(sa),S(sb) -> single (sa ^ sb)
@@ -61,7 +61,7 @@ let pack_split_reducer split reducer =
   let maximum = None
   in
   {
-    empty = empty;
+    empty = (fun () -> empty);
     append = append;
     merge = merge;
     result = result;

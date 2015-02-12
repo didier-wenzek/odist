@@ -1,33 +1,43 @@
 (** Abstraction of dataset processing using union fold. *)
 
+(** A reducer of type [('a,'b','c) red] abstracts a reduction operation :
+  - over a stream of ['a] items,
+  - which are aggregated into some ['b] value,
+  - bringing a final outcome of type ['c].
+
+  The aggregate values may be statefull and are built
+  - starting from empty values (or buffers if there are effects)
+  - to be filled and combined using the [append] and [merge] functions of the reducer
+  - and transformed into a final outcome using the [result] function.
+*)
 type ('a,'b,'c) red = {
-  empty: 'b;
+  empty: unit -> 'b;
   append: 'b -> 'a -> 'b;
   merge: 'b -> 'b -> 'b;
   result: 'b -> 'c;
   maximum: ('b -> bool) option;
 }
-(** A reducer abstracts a reduction operation :
-  - over a stream of ['a] items,
-  - which are aggregated into some ['b] value,
-  - used to build a final outcome ['c].
-*)
 
+(** Collection type.
+
+  A dataset is only defined indirectly by the ability to fold its content using a reducer.
+*)
 type 'a col = {
   fold: 'b 'c. ('a,'b,'c) red -> 'b  -> 'b;
 }
-(** Collection type.
 
-  A dataset is only defined indirectly by the ability to fold its content into an aggregate using
-  - an empty initial aggregate,
-  - a function to inject one item into an aggregate,
-  - a function to merge two aggregates.
-*)
-
-type 'a monoid = ('a,'a,'a) red
 (** A monoid is the primary form of reducers.
+
   It is built around an associative operation with an identity.
 *)
+type 'a monoid = ('a,'a,'a) red
+
+(* An action wraps a statefull and/or effectfull system. *)
+type ('a,'s,'b) action = {
+  init: unit -> 's;
+  act: 'a -> 's -> 's;
+  term: 's -> 'b;
+}
 
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'b,'c) red -> 'a col -> 'c

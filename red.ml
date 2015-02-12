@@ -24,7 +24,7 @@ let first =
     | _ -> a
   in
   {
-    empty = None;
+    empty = (fun () -> None);
     append = append;
     merge = merge;
     result = id;
@@ -39,7 +39,7 @@ let last =
     | _ -> b
   in
   {
-    empty = None;
+    empty = (fun () -> None);
     append = append;
     merge = merge;
     result = id;
@@ -48,7 +48,7 @@ let last =
 
 let taking n reducer =
   {
-     empty = (0,reducer.empty);
+     empty = (fun () -> (0,reducer.empty ()));
      result = (fun (_,r) -> reducer.result r);
      append = (fun (c,xs) x -> (c+1, reducer.append xs x));
      merge = (fun (c,xs) (d,ys) -> (c+d, reducer.merge xs ys)); (* FIXME: how to avoid taking more than n items. *)
@@ -57,7 +57,7 @@ let taking n reducer =
 
 let to_list =
   {
-    empty = [];
+    empty = (fun () -> []);
     append = (fun xs x -> x::xs);
     merge = (fun xs ys -> ys @ xs);
     result = (fun xs -> List.rev xs);
@@ -66,7 +66,7 @@ let to_list =
 
 let to_bag =
   {
-    empty = [];
+    empty = (fun () -> []);
     append = (fun xs x -> x::xs);
     merge = List.rev_append;
     result = id;
@@ -85,7 +85,7 @@ module SetRed(S: Set.S) = struct
 
   let union_reducer =
   {
-    empty = S.empty;
+    empty = const S.empty;
     append = (fun xs x -> S.add x xs);
     merge = S.union;
     result = id;
@@ -113,14 +113,14 @@ module MapRed(M: Map.S) = struct
   include M
 
   let grouping_with value_reducer =
-    let get m k = try M.find k m with Not_found -> value_reducer.empty in
+    let get m k = try M.find k m with Not_found -> value_reducer.empty () in
     let value_merger k oa ob = match (oa,ob) with
       | (None, _) -> ob
       | (_, None) -> oa
       | (Some a, Some b) -> Some (value_reducer.merge a b)
     in
     {
-      empty = M.empty;
+      empty = (fun () -> M.empty);
       append = (fun m (k,v) -> let v' = get m k in let v'' = value_reducer.append v' v in M.add k v'' m);
       merge = M.merge value_merger;
       result = id;
@@ -165,7 +165,7 @@ module NumRed(N: NUM) = struct
   let product = monoid N.one N.mul |> with_maximum N.zero
 
   let count = {
-    empty = N.zero;
+    empty = (fun () -> N.zero);
     append = (fun c x -> N.add c N.one);
     merge = N.add;
     result = id;

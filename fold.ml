@@ -2,7 +2,7 @@ open Util
 open Infix
 
 type ('a,'b,'c) red = {
-  empty: 'b;
+  empty: unit -> 'b;
   append: 'b -> 'a -> 'b;
   merge: 'b -> 'b -> 'b;
   result: 'b -> 'c;
@@ -12,18 +12,26 @@ type ('a,'b,'c) red = {
 type 'a col = {
   fold: 'b 'c. ('a,'b,'c) red -> 'b  -> 'b;
 }
+
 type 'a monoid = ('a,'a,'a) red
 
+type ('a,'s,'b) action = {
+  init: unit -> 's;
+  act: 'a -> 's -> 's;
+  term: 's -> 'b;
+}
+
 let reduce red col =
+  let seed = red.empty () in
   let acc = match red.maximum with
-  | None -> col.fold red red.empty
+  | None -> col.fold red seed
   | Some(maximum) -> with_return (fun return ->
     let append_or_return acc i = if maximum acc then return acc else red.append acc i in
     let merge_or_return a b = let m = red.merge a b in if maximum m then return m else m in
     col.fold { red with
       append = append_or_return;
       merge = merge_or_return;
-    } red.empty
+    } seed
   )
   in red.result acc
 
@@ -96,7 +104,7 @@ let pair_reducer l_red r_red =
   let split_merge (l1, r1) (l2, r2) = (l_red.merge l1 l2, r_red.merge r1 r2) in
   let pair_result (l,r) = ((l_red.result l),(r_red.result r)) in
   {
-    empty = (l_red.empty, r_red.empty);
+    empty = (fun () -> (l_red.empty (), r_red.empty ()));
     append = split_append;
     merge = split_merge;
     result = pair_result;
@@ -111,7 +119,7 @@ let returning result reducer =
 
 let monoid zero plus =
   {
-    empty = zero;
+    empty = (fun () -> zero);
     append = plus;
     merge = plus;
     result = id;
@@ -129,7 +137,7 @@ let opt_monoid comb =
     | Some(a),Some(b) -> Some (comb a b)
   in
   {
-    empty = None;
+    empty = (fun () -> None);
     append = append;
     merge = merge;
     result = id;
@@ -150,7 +158,7 @@ let with_maximum_check maximum red =
 
 let col_monoid empty append merge collect =
   {
-    empty = empty;
+    empty = (fun () -> empty);
     append = append;
     merge = merge;
     result = collect;

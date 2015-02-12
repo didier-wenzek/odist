@@ -1,11 +1,5 @@
 open Fold
 
-type ('a,'s,'b) action = {
-  init: unit -> 's;
-  act: 'a -> 's -> 's;
-  term: 's -> 'b;
-}
-
 type 's computation = State of 's | Action of ('s -> 's)
 
 let apply act c a = match c with
@@ -23,7 +17,7 @@ let term_with term c = match c with
 
 let actor action = 
   {
-    empty = Action (fun s -> s);
+    empty = (fun () -> Action (fun s -> s));
     append = apply action.act;
     merge = and_then;
     result = term_with action.term;
