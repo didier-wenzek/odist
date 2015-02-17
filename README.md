@@ -13,8 +13,8 @@ The core of ODist is dataset processing :
     Col.of_range 1 100 |> filter even |> map square |> reduce sum
 
 The aim of ODist is to abstract data processing in such a way
-that processing of a distributed dataset can be done
-using the same processing pipeline as a local dataset.
+that the treatment of a distributed dataset can be done
+using the same processing pipeline as for a local dataset.
 For instance, counting the occurrences of each word in a list of files
 can be defined as a `word_count` function which can be indifferently applied 
 to local and distributed sets of files.
@@ -34,7 +34,7 @@ to local and distributed sets of files.
 
 For that, all input datasets are abstracted by a single type `'a Odist.col`
 which values can be uniformaly manipulated
-whatever is the underlying data structure.
+whatever is the underlying data structure and the involved processing resources.
 
     Col.of_range 1 100
     Col.of_list [1;2;3;4;5]
@@ -52,9 +52,9 @@ Similarly, `Col.of_file_lines "/tmp/foo"` turns a file into a collection of stri
 
 In a parallel or distributed setting (latter is not yet implemented),
 a former collection is broken into parts, one per computing unit.
-These parts are processed in parallel to produce result parts
+These parts are processed in parallel to produce partial results
 which has to be reduced in a final outcome.
-A key point is how the former dataset is distributed over computing units.
+A key point, for performance, is how the former dataset is distributed over computing units.
 
     (* Sequential computation *)
     (* 15.6 s on my desktop *)
@@ -71,8 +71,8 @@ A key point is how the former dataset is distributed over computing units.
     let par_range n m = Col.of_range 0 (n-1) |> cores.distribute |> flatmap (chunk m)
     par_range 4 25000000 |> sum_square_of_evens
 
-Underneath, two abstractions hand by hand : collections and reducers.
-Collections provide the content and reducers the rules to fold this content.
+Underneath, two abstractions work hand by hand : collections and reducers.
+Collections provide the content and reducers the rules to fold such content.
 Hence a collection is only defined by the ability to fold its content using a reducer which provides:
 - an empty aggregate,
 - a function to inject one item into an aggregate,
