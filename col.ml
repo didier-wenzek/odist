@@ -128,7 +128,7 @@ let of_subdirs ?(recursive = true) path =
 (* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
 let fold_file_chunks size path comb seed =
   let channel = open_in path in
-  let buffer = String.create size in
+  let buffer = Bytes.create size in
   let rec loop acc =
     let l = input channel buffer 0 size in
     if l = 0
@@ -156,7 +156,7 @@ let string_chars str start len comb seed =
 (* [file_characters path comb seed] combines all characters of the file with the given [path]. *)
 let file_characters path comb seed =
   let channel = open_in path in
-  let buffer = String.create 8192 in
+  let buffer = Bytes.create 8192 in
   let rec loop acc =
     let l = input channel buffer 0 8192 in
     if l = 0
