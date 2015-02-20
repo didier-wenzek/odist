@@ -84,3 +84,14 @@ let _ =
   let s_seq = seq_range 4 25 |> sum_square_of_evens in
   assert (s_par = s_seq);
 
+  let a = Array.init 5 (fun i -> i+1) in
+  let fact = Col.of_array a |> reduce (monoid 1 ( * )) in
+  assert (120 = fact);
+  
+  let a = Col.of_range 0 9 |> map (fun i -> i,i) |> reduce (Red.array_reducer 5 to_list) in
+  assert (a = [| [0;5]; [1;6]; [2;7]; [3;8]; [4;9] |]);
+  let ai = Col.of_array_i a |> reduce to_list in
+  assert (ai = [ 0,[0;5]; 1,[1;6]; 2,[2;7]; 3,[3;8]; 4,[4;9] ]);
+  let fai = Col.of_array_i a |> flatmap (fun (i,xs) -> Col.of_list xs |> map (fun x -> (i,x))) |> reduce to_list in
+  assert (fai = [ 0,0; 0,5; 1,1; 1,6; 2,2; 2,7; 3,3; 3,8; 4,4; 4,9 ])
+

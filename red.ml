@@ -138,6 +138,24 @@ end
 
 module MakeMapRed(E: Map.OrderedType) = MapRed(Map.Make(E))
 
+let array_reducer n red = {
+  empty = (fun () -> Array.init n (fun _ -> red.empty ()));
+  append = (fun a (i,x) ->
+    let i' = i mod n in
+    let x' = red.append (Array.get a i') x in
+    Array.set a i' x'; a
+  );
+  merge = (fun a b ->
+    let update i x =
+      let x' = red.merge x (Array.get b i)
+      in Array.set a i x'
+    in
+    Array.iteri update a; a
+  );
+  result = Array.map red.result;
+  maximum = None;
+}
+
 module type NUM = sig
   type t
 

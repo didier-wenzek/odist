@@ -15,6 +15,12 @@ val concat: 'a Fold.col -> 'a Fold.col -> 'a Fold.col
 val of_list: 'a list -> 'a Fold.col
 (* [Col.of_list l] wraps the ocaml list [l] into a foldable collection. *)
 
+val of_array: 'a array -> 'a Fold.col
+(* [Col.of_array a] wraps the ocaml array [a] into a foldable collection. *)
+
+val of_array_i: 'a array -> (int*'a) Fold.col
+(* [Col.of_array_i a] wraps the ocaml array [a] into a foldable collection of ['a] values with their index in the array. *)
+
 val of_range: int -> int -> int Fold.col
 (* [Col.of_range min max] builds the foldable collection of all integers from [min] to [max] inclusive. *)
 

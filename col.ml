@@ -36,6 +36,26 @@ let of_range min max =
     fold = fold;
   }
 
+let of_array xs =
+  let fold red acc = Array.fold_left red.append acc xs in
+  {
+    fold = fold;
+  }
+
+let of_array_i a =
+  let fold red =
+    let n = Array.length a in
+    let get = Array.get a in
+    let comb = red.Fold.append in
+    let rec loop i s =
+      if i = n then s
+      else loop (i+1) (comb s (i,get i))
+    in loop 0 
+  in
+  {
+     Fold.fold = fold
+  }
+
 let iterdir f path =
   let dir = opendir path in
   try

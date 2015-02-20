@@ -47,6 +47,8 @@ end
 module MapRed(M: Map.S) : MAP 
 module MakeMapRed(E: Map.OrderedType) : MAP with type key = E.t
 
+val array_reducer: int -> ('a,'s,'r) red -> (int*'a,'s array,'r array) red
+
 module type NUM = sig
   type t
 
