@@ -33,6 +33,10 @@ let _ =
   let s = Col.of_list [1;2;3;4;5] |> sum_square_of_evens in
   assert( s = 20);
 
+  let (es,os) = Col.of_list [1;2;3;4;5] |> reduce (Red.partition even to_list to_list) in
+  assert( es = [2;4]);
+  assert( os = [1;3;5]);
+
   let s = nested_list (N [L [1;2;3]; L[4;5;6;7]; N [ L[]; L[8;9] ]]) |> reduce to_list in
   assert (s = [1; 2; 3; 4; 5; 6; 7; 8; 9]);
 

@@ -55,6 +55,17 @@ let taking n reducer =
      maximum = Some (fun (c,_) -> c >= n);
   }
 
+let partition p true_red false_red =
+  {
+    empty = (fun () -> (true_red.empty (), false_red.empty ()));
+    append = (fun (ts,fs) x -> if p x then (true_red.append ts x, fs) else (ts, false_red.append fs x));
+    merge = (fun (ts1,fs1) (ts2,fs2) -> (true_red.merge ts1 ts2, false_red.merge fs1 fs2));
+    result = (fun (ts,fs) -> (true_red.result ts, false_red.result fs));
+    maximum = match (true_red.maximum, false_red.maximum) with
+      | Some(tmax), Some(fmax) -> Some (fun (ts,fs) -> tmax ts && fmax fs)
+      | _ -> None;
+  }
+
 let to_list =
   {
     empty = (fun () -> []);

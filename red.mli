@@ -13,6 +13,7 @@ val min_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a option) red
 val first: ('a, 'a option, 'a option) red
 val last: ('a, 'a option, 'a option) red
 val taking: int -> ('a,'b,'c) red -> ('a,int*'b,'c) red
+val partition: ('a -> bool) -> ('a,'b,'c) red -> ('a,'d,'e) red -> ('a,'b*'d,'c*'e) red
 
 val to_list: ('a, 'a list, 'a list) red
 val to_bag: ('a, 'a list, 'a list) red
