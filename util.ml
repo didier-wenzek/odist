@@ -1,20 +1,26 @@
-(** [using_context init term f arg] applies the function [f]
-    to the [context] value returned by [init arg],
-    ensures that [term context] is called
-    and returns the value of [f context].
-
-    [val using_context : ('arg -> 'ctx) -> ('ctx -> 'unit) -> ('ctx -> 'res) -> 'arg -> 'res]
+(** [protect ~finally f x] calls [f x] and ensures that [finally ()] is called before returning [f x].
 
     Adapted from http://stackoverflow.com/questions/11276985/emulating-try-with-finally-in-ocaml.
 *)
-let using_context init term task arg =
+let protect ~finally f x =
   let module E = struct type 'a t = Left of 'a | Right of exn end in
-  let ctx = init arg in
-  let res = try E.Left (task ctx) with e -> E.Right e in
-  let _ = term ctx in
+  let res = try E.Left (f x) with e -> E.Right e in
+  let () = finally () in
   match res with
   | E.Left  r -> r
   | E.Right e -> raise e
+
+(** [using_context init term f arg]
+    - applies the function [f] to the [context] value returned by [init arg],
+    - ensures that [term context] is called
+    - and returns the value of [f context].
+
+    [val using_context : ('arg -> 'ctx) -> ('ctx -> 'unit) -> ('ctx -> 'res) -> 'arg -> 'res]
+*)
+let using_context init term task arg =
+  let ctx = init arg in
+  let finally () = term ctx in
+  protect ~finally task ctx
 
 (* Function that lets you return early from a computation.
    Adapted from Alan Frish's version of https://ocaml.janestreet.com/?q=node/91,
