@@ -3,8 +3,8 @@ open Infix
 
 let and_reducer = monoid true (&&) |> with_maximum_check not
 let or_reducer = monoid false (||) |> with_maximum_check id
-let forall p = fold p and_reducer
-let exists p = fold p or_reducer
+let forall p = map p >> reduce and_reducer
+let exists p = map p >> reduce or_reducer
 
 let max_reducer compare =
   let max a b = if compare a b >= 0 then a else b
@@ -66,6 +66,16 @@ let partition p true_red false_red =
       | _ -> None;
   }
 
+let to_string_buffer size = {
+  empty = (fun () -> Buffer.create size);
+  append = (fun buf str -> Buffer.add_string buf str; buf);
+  merge = (fun buf str -> Buffer.add_buffer buf str; buf);
+  result = id;
+  maximum = None
+}
+
+let to_string = to_string_buffer 16 |> returning Buffer.contents
+
 let to_list =
   {
     empty = (fun () -> []);
@@ -104,8 +114,8 @@ module SetRed(S: Set.S) = struct
   }
 
   let items xs =
-  {
-     fold = (fun red acc -> S.fold (fun x xs -> red.append xs x) xs acc);
+  Stream {
+     sfold = (fun red acc -> S.fold (fun x xs -> red xs x) xs acc);
   }
 end
 
@@ -142,8 +152,8 @@ module MapRed(M: Map.S) = struct
   let grouping reducer = mapping (fun x -> (x,x)) (grouping_with reducer)
 
   let pairs m =
-    {
-      fold = (fun red acc -> M.fold (fun k v acc -> red.append acc (k,v)) m acc);
+    Stream {
+      sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) m acc);
     }
 end
 

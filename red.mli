@@ -15,6 +15,9 @@ val last: ('a, 'a option, 'a option) red
 val taking: int -> ('a,'b,'c) red -> ('a,int*'b,'c) red
 val partition: ('a -> bool) -> ('a,'b,'c) red -> ('a,'d,'e) red -> ('a,'b*'d,'c*'e) red
 
+val to_string_buffer: int -> (string,Buffer.t,Buffer.t) red
+val to_string: (string,Buffer.t,string) red
+
 val to_list: ('a, 'a list, 'a list) red
 val to_bag: ('a, 'a list, 'a list) red
 

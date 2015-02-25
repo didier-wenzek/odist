@@ -1,4 +1,14 @@
 open Fold
+open Util
+open Infix
+
+type ('a,'m,'s) action = {
+  reducer: ('a,'m,'m) Fold.red;
+  init: unit -> 's;
+  push_item: 's -> 'a -> 's;
+  push: 's -> 'm -> 's;
+  term: 's -> unit;
+}
 
 type 's computation = State of 's | Action of ('s -> 's)
 
@@ -15,36 +25,35 @@ let term_with term c = match c with
   | State s -> term s
   | _ -> assert false
 
-let actor action = 
-  {
-    empty = (fun () -> Action (fun s -> s));
-    append = apply action.act;
-    merge = and_then;
-    result = term_with action.term;
-    maximum = None;
-  }
+let ssingle x = { sfold = (fun comb acc -> comb acc x) }
 
-let stream action col =
-  let actor = actor action in
-  let state = State (action.init ()) in
-  try actor.result (col.fold actor state)
-  with e -> actor.result state; raise e
+let sstream sys xs =
+  let fold hdl = ignore (xs.sfold sys.push_item hdl) in
+  let hdl = sys.init () in
+  let finally () = sys.term hdl in
+  protect ~finally fold hdl
+
+let stream sys col =
+  let fold hdl = function
+    | Stream xs -> xs.sfold sys.push_item hdl
+    | Parcol xss -> xss.pfold (fun xs -> reduce sys.reducer xs |> ssingle) sys.push hdl
+  in
+  let hdl = sys.init () in
+  let finally () = sys.term hdl in
+  ignore (protect ~finally (fold hdl) col)
 
 let to_printer = {
-  init = (fun () -> ());
-  act = (fun s () -> print_string s);
-  term = (fun () -> ());
+  reducer = Red.to_string_buffer 64;
+  init = nop;
+  push_item = (fun () c -> print_string c);
+  push = (fun out s -> Buffer.output_buffer stdout s);
+  term = nop;
 }
 
 let to_file_printer file = {
+  reducer = Red.to_string_buffer 64;
   init = (fun () -> open_out file);
-  act = (fun s out -> output_string out s; out);
+  push_item = (fun out s -> output_string out s; out);
+  push = (fun out s -> Buffer.output_buffer out s; out);
   term = close_out;
 }
-
-let to_string_buffer size =
-  {
-    init = (fun () -> Buffer.create size);
-    act = (fun str buf -> Buffer.add_string buf str; buf);
-    term = (fun buf -> Buffer.contents buf);
-  }

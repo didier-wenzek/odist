@@ -1,6 +1,10 @@
 open Util
 open Infix
 
+type 'a sfoldable = { sfold: 'b. ('b -> 'a -> 'b) -> 'b -> 'b }
+type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b sfoldable) -> ('c -> 'b -> 'c) -> 'c -> 'c }
+type 'a col = Stream of 'a sfoldable | Parcol of 'a col pfoldable
+
 type ('a,'b,'c) red = {
   empty: unit -> 'b;
   append: 'b -> 'a -> 'b;
@@ -9,31 +13,73 @@ type ('a,'b,'c) red = {
   maximum: ('b -> bool) option;
 }
 
-type 'a col = {
-  fold: 'b 'c. ('a,'b,'c) red -> 'b  -> 'b;
+type ('a,'m,'s) action = {
+  reducer: ('a,'m,'m) red;
+  init: unit -> 's * (unit -> unit);
+  push_item: 'a -> 's -> 's;
+  push: 'm -> 's -> 's;
 }
 
 type 'a monoid = ('a,'a,'a) red
 
-type ('a,'s,'b) action = {
-  init: unit -> 's;
-  act: 'a -> 's -> 's;
-  term: 's -> 'b;
-}
+let ssingle x = { sfold = (fun comb acc -> comb acc x) }
 
 let reduce red col =
-  let seed = red.empty () in
   let acc = match red.maximum with
-  | None -> col.fold red seed
-  | Some(maximum) -> with_return (fun return ->
-    let append_or_return acc i = if maximum acc then return acc else red.append acc i in
-    let merge_or_return a b = let m = red.merge a b in if maximum m then return m else m in
-    col.fold { red with
-      append = append_or_return;
-      merge = merge_or_return;
-    } seed
-  )
-  in red.result acc
+    | None -> (
+      let rec loop = function
+        | Stream xs -> xs.sfold red.append (red.empty ())
+        | Parcol xss -> xss.pfold (fun xs -> loop xs |> ssingle) red.merge (red.empty ())
+      in loop col
+    )
+    | Some(maximum) -> with_return (fun return ->
+      let append_or_return acc i = if maximum acc then return acc else red.append acc i in
+      let merge_or_return a b = if maximum a then return a else red.merge a b in
+      let rec loop = function
+        | Stream xs -> xs.sfold append_or_return (red.empty ())
+        | Parcol xss -> xss.pfold (fun xs -> loop xs |> ssingle) merge_or_return (red.empty ())
+      in loop col
+    )
+  in
+  red.result acc
+
+let smap f xs = { sfold = (fun comb -> xs.sfold (fun acc x -> comb acc (f x))) }
+let pmap f xss = { pfold = (fun g -> xss.pfold (fun xs -> g (f xs))) }
+let rec map f = function
+  | Stream xs -> Stream (smap f xs)
+  | Parcol xss -> Parcol (pmap (map f) xss)
+
+let sfilter p xs = { sfold = (fun comb -> xs.sfold (fun acc x -> if p x then comb acc x else acc)) }
+let rec filter p = function
+  | Stream xs -> Stream (sfilter p xs)
+  | Parcol xss -> Parcol (pmap (filter p) xss)
+
+let rec to_sfoldable = function
+  | Stream xs -> xs
+  | Parcol xss -> { sfold = (fun comb -> xss.pfold to_sfoldable comb)}
+
+let sfold comb seed col = col.sfold comb seed
+let fold comb seed col = (to_sfoldable col).sfold comb seed
+
+let sflatmap f xs = { sfold = (fun comb -> xs.sfold (fun acc x -> fold comb acc (f x))) }
+let rec flatmap f = function
+  | Stream xs -> Stream (sflatmap f xs)
+  | Parcol xss -> Parcol (pmap (flatmap f) xss)
+
+let sunnest f xs = { sfold = (fun comb -> xs.sfold (fun acc x -> fold (fun a i -> comb a (x,i)) acc (f x))) }
+let rec unnest f = function
+  | Stream xs -> Stream (sunnest f xs)
+  | Parcol xss -> Parcol (pmap (unnest f) xss)
+
+let col_product l_col r_col pair =
+  let append_pair append l_item acc r_item = append acc (pair l_item r_item) in
+  let append_pairs append acc x = fold (append_pair append x) acc r_col in
+  let sproduct xs = { sfold = (fun append -> xs.sfold (append_pairs append)) } in
+  let rec product = function
+    | Stream xs -> Stream (sproduct xs)
+    | Parcol xss -> Parcol (pmap product xss)
+  in
+  product l_col
 
 let mapping f red =
   let comb_map f comb acc item = comb acc (f item) in
@@ -42,13 +88,6 @@ let mapping f red =
     append = comb_map f red.append
   }
 
-let map f col =
-  {
-    fold = (fun red -> col.fold (mapping f red));
-  }
-
-let fold f red = reduce (mapping f red)
-
 let filtering p red =
   let comb_filter p comb acc item = if p item then comb acc item else acc in
   {
@@ -56,49 +95,19 @@ let filtering p red =
     append = comb_filter p red.append
   }
 
-let filter p col =
-  {
-    fold = (fun red -> col.fold (filtering p red));
-  }
-
 let flatmapping f red =
-  let comb_flatmap acc item = (f item).fold red acc in
+  let comb_flatmap acc item = fold red.append acc (f item) in
   {
     red with
     append = comb_flatmap
   }
 
-let flatmap f col =
-  {
-    fold = (fun red -> col.fold (flatmapping f red));
-  }
-
 let unnesting f red =
-  let inner_red item1 = { red with
-    append = (fun acc2 item2 -> red.append acc2 (item1,item2));
-  }
-  in { red with
-    append = (fun acc1 item1 -> (f item1).fold (inner_red item1) acc1);
+  let inner_red item1 acc2 item2 = red.append acc2 (item1,item2) in
+  { red with
+    append = (fun acc1 item1 -> fold (inner_red item1) acc1 (f item1));
   }
 
-let unnest f col =
-  {
-    fold = (fun red -> col.fold (unnesting f red));
-  }
-
-let col_product l_col r_col pair =
-  let appending_pair red l_item = { red with
-    append = (fun acc r_item -> red.append acc (pair l_item r_item));
-  }
-  in
-  let inner_red red = { red with
-     append = (fun acc l_item -> r_col.fold (appending_pair red l_item) acc);
-  }
-  in
-  {
-    fold = (fun red -> l_col.fold (inner_red red));
-  }
- 
 let pair_reducer l_red r_red =
   let split_append (l_acc, r_acc) item = (l_red.append l_acc item, r_red.append r_acc item) in
   let split_merge (l1, r1) (l2, r2) = (l_red.merge l1 l2, r_red.merge r1 r2) in
@@ -164,5 +173,4 @@ let col_monoid empty append merge collect =
     result = collect;
     maximum = None;
   }
-
 

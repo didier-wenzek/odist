@@ -24,15 +24,6 @@ let fork_n n task =
 
 let marshall_encoding = ((fun a -> Marshal.to_string a []), (fun s -> Marshal.from_string s 0))
 
-let union_reducer red =
-  {
-    empty = red.empty;
-    append = red.merge;
-    merge = red.merge;
-    result = id;
-    maximum = None;
-  }
-
 let make_channel_name =
   let pid = Unix.getpid () in
   let seq = ref 0 in
@@ -58,23 +49,21 @@ module ZmqPullPushCores : sig
     returns an action to be used to scatter all values of a collection over the channel.
   
     In practice this action, has to be adapted to encode values and to allot them to nodes of the cluster.
-    [my_collection |> stream_to (scatter cluster channel_name |> encoding_with encode |> allotting_with hash)]
+    [my_collection |> stream_to (scatter cluster channel_name |> allotting_with hash)]
   *)
-  val scatter: t -> string -> (int*string,outfan,unit) action
+  val scatter: t -> string -> (int*string, (int*string) list,outfan) action
   
-  val encoding_with: ('a -> string) -> (int*string,outfan,unit) action -> (int*'a,outfan,unit) action
+  val allotting_with: ('a -> int) -> (int*'a,'b,outfan) action -> ('a,'b,outfan) action
   
-  val allotting_with: ('a -> int) -> (int*'a,outfan,unit) action -> ('a,outfan,unit) action
-  
-  val using_roundrobin: (int*'a,outfan,unit) action -> ('a,int*outfan,unit) action
+  val using_roundrobin: (int*'a,'b,outfan) action -> ('a,'a list,int*outfan) action
   
   (**
     [gather cluster channel_name] gathers (node,message) of type (int,string) received from the cluster on the given channel.
     The gathering ends when all nodes of the cluster has called the [term ()] method of scattering action.
   *)
-  val gather: t -> string -> (int * string) Fold.col
+  val gather: t -> string -> (int * string) Fold.sfoldable
   
-  val ignore_order: (int * string) Fold.col -> string Fold.col
+  val ignore_order: (int * string) Fold.sfoldable -> string Fold.sfoldable
 
   (** [col |> distribute ipcdir node_count] distributes the elements of a collection over the cluster nodes.*)
   val distribute: string -> int -> 'a Fold.col -> 'a Fold.col
@@ -117,14 +106,25 @@ end = struct
   let close this_node outfan =
     Zmq.send_multiparts outfan ["E"; this_node]; Zmq.close outfan
   
+  let revlist_reducer = {
+         empty = (fun () -> []);
+         append = (fun xs x -> x::xs); 
+         merge = (fun xs ys -> ys @ xs);
+         result = id;
+         maximum = None; 
+       }
+  let fold_revlist push = (fun acc xs -> let xs = List.rev xs in List.fold_left push acc xs)
+
   let scatter cluster channel_name  =
     let connect_outfan = connect_outfan cluster channel_name in
     let close_outfan = close cluster.this_node in
     let connect () = Array.init cluster.size connect_outfan in
-    let push (node,msg) outfans = send cluster.this_node msg outfans.(node mod cluster.size);outfans in
+    let push outfans (node,msg) = send cluster.this_node msg outfans.(node mod cluster.size);outfans in
     {
+       reducer = revlist_reducer;
        init = connect;
-       act = push;
+       push_item = push;
+       push = fold_revlist push;
        term = Array.iter close_outfan;
     }
   
@@ -135,19 +135,23 @@ end = struct
     outfan
 
   let fair_scatter cluster channel_name  =
-    let connect_outfan point outfan =
+    let connect_outfan outfan point =
       let channel = ipc_channel channel_name (string_of_int point) in 
       Zmq.connect outfan channel; outfan
     in
     let to_outfan_connector = {
-      init = (fun () -> Zmq.socket cluster.context Zmq.PUSH);
-      act = connect_outfan;
-      term = id;
+      empty = (fun () -> Zmq.socket cluster.context Zmq.PUSH);
+      append = connect_outfan;
+      merge = (fun a b -> a); (* FIXME *)
+      result = id;
+      maximum = None;
     } in
-    let push msg outfan = send cluster.this_node msg outfan;outfan in
+    let push outfan msg = send cluster.this_node msg outfan;outfan in
     {
-       init = (fun () -> Col.of_range 0 (cluster.size -1) |> stream to_outfan_connector);
-       act = push;
+       reducer = revlist_reducer;
+       init = (fun () -> Col.of_range 0 (cluster.size -1) |> reduce to_outfan_connector);
+       push_item = push;
+       push = fold_revlist push;
        term = close cluster.this_node;
     }
   
@@ -174,41 +178,35 @@ end = struct
        with error -> Zmq.close infan; raise error
   
   let gather cluster channel_name =
-    let fold red acc = gather_fold cluster channel_name red.append acc in
+    let fold red acc = gather_fold cluster channel_name red acc in
     {
-      fold = fold;
+      sfold = fold;
     }
 
-  let encoding_with encode action =
-    let encode_than_act (nodeid,item) = action.act (nodeid,encode item) in
-    {
-       action with
-       act = encode_than_act;
-    }
-  
   let allotting_with hash action =
-    let allot_than_act item = action.act (hash item,item) in
+    let pair_with_hash item = (hash item,item) in
+    let allot_than_act s item = action.push_item s (hash item,item) in
     {
        action with
-       act = allot_than_act;
+       reducer = mapping pair_with_hash action.reducer;
+       push_item = allot_than_act;
     }
   
   let using_roundrobin action =
-    let allot_than_act item = (fun (lot,state) -> (lot+1, action.act (lot,item) state)) in
+    let allot_than_act (lot,state) item = (lot+1, action.push_item state (lot,item)) in
     {
+       reducer = revlist_reducer;
        init = (fun () -> (0,action.init ()));
-       act = allot_than_act;
+       push_item = allot_than_act;
+       push = fold_revlist allot_than_act;
        term = (fun (_,state) -> action.term state);
     }
-  
+
   let ignore_order node_msg_pairs =
-    let ignoring_order red = { red with
-      append = (fun acc (_,msg) -> red.append acc msg);
-    }
-    in
-    let fold red = node_msg_pairs.fold (ignoring_order red) in
+    let ignoring_order red = (fun acc (_,msg) -> red acc msg); in
+    let fold red = node_msg_pairs.sfold (ignoring_order red) in
     {
-       fold = fold
+       sfold = fold
     }
   
   let distribute ipcdir size col =
@@ -216,21 +214,19 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = stream (scatter cluster name |> encoding_with encode |> using_roundrobin) in
-    let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
-    let par_fold red seed =
-       let partial_reducer = red in
-       let final_reducer = union_reducer red in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> smap decode in
+    let stream_to_channel cluster name = smap encode >> sstream (scatter cluster name |> using_roundrobin) in
+    let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
-         launch_bg 1 size (fun cluster -> col |> stream_to_channel cluster channel_A);
-         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> reduce partial_reducer |> single |> stream_to_channel cluster channel_B);
-         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> reduce final_reducer)
+         launch_bg 1 size (fun cluster -> col |> to_sfoldable |> stream_to_channel cluster channel_A);
+         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> fun xs -> Stream xs |> part_reducer |> stream_to_channel cluster channel_B);
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> sfold comb_reducer seed)
        end
     in
-    {
-       fold = par_fold
+    Parcol {
+       pfold = par_fold
     }
 
   let fair_distribute ipcdir size col =
@@ -238,21 +234,19 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = map encode >> stream (fair_scatter cluster name) in
-    let gather_from_channel cluster name = gather cluster name |> ignore_order |> map decode in
-    let par_fold red seed =
-       let partial_reducer = red in
-       let final_reducer = union_reducer red in
+    let stream_to_channel cluster name = smap encode >> sstream (fair_scatter cluster name) in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> smap decode in
+    let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
-         launch_bg 1 size (fun cluster -> col |> stream_to_channel cluster channel_A);
-         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> reduce partial_reducer |> single |> stream_to_channel cluster channel_B);
-         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> reduce final_reducer)
+         launch_bg 1 size (fun cluster -> col |> to_sfoldable |> stream_to_channel cluster channel_A);
+         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> fun xs -> Stream xs |> part_reducer |> stream_to_channel cluster channel_B);
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> sfold comb_reducer seed)
        end
     in
-    {
-       fold = par_fold
+    Parcol {
+       pfold = par_fold
     }
 end
  

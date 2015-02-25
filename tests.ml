@@ -9,13 +9,13 @@ let sum_square_of_evens = filter even >> map square >> reduce sum
 type 'a nested_list = L of 'a list | N of 'a nested_list list
 let fold_nested_list red =
     let rec fold acc l = match l with
-    | L xs -> List.fold_left red.append acc xs
+    | L xs -> List.fold_left red acc xs
     | N xxs -> List.fold_left fold acc xxs
     in fold
 
 let nested_list xs =
-    {
-      fold = (fun red acc -> fold_nested_list red acc xs);
+    Stream {
+      sfold = (fun red acc -> fold_nested_list red acc xs);
     }
 
 module S = MakeSetRed(struct
@@ -69,7 +69,7 @@ let _ =
   let m = Col.of_list [1.2; 2.4; 3.6] |> reduce mean in
   assert (m = 2.4);
 
-  let s = Col.of_range 0 9 |> map string_of_int |> stream (to_string_buffer 16) in
+  let s = Col.of_range 0 9 |> map string_of_int |> reduce to_string in
   assert ( s = "0123456789");
 
   Col.of_range 1 100 |> map string_of_int |> flatmap (fun s -> Col.of_list [s;"\n"]) |> stream (to_file_printer "/tmp/foo");

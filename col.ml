@@ -1,59 +1,58 @@
 open Unix
 open Fold
 
-let empty = {
-    fold = (fun _ e -> e);
+let empty = Stream {
+    sfold = (fun _ e -> e);
   }
 
-let single x = {
-    fold = (fun red e -> red.append e x);
+let single x = Stream {
+    sfold = (fun red e -> red e x);
   }
 
-let cons x xs = {
-   fold = (fun red seed -> xs.fold red (red.append seed x));
+let cons x xs = Stream {
+   sfold = (fun red seed -> fold red (red seed x) xs );
 }
 
-let append xs x = {
-    fold = (fun red e -> red.append (xs.fold red e) x);
+let append xs x = Stream {
+    sfold = (fun red e -> red (fold red e xs) x);
   }
 
-let concat xs ys = {
-    fold = (fun red e -> ys.fold red (xs.fold red e));
+let concat xs ys = Stream {
+    sfold = (fun red e -> fold red (fold red e xs) ys);
   }
 
 let of_list xs =
-  let fold red acc = List.fold_left red.append acc xs in
-  {
-    fold = fold;
+  let fold red acc = List.fold_left red acc xs in
+  Stream {
+    sfold = fold;
   }
 
 let of_range min max =
   let fold red acc =
-    let rec loop a i = if i>max then a else loop (red.append a i) (i+1)
+    let rec loop a i = if i>max then a else loop (red a i) (i+1)
     in loop acc min
   in
-  {
-    fold = fold;
+  Stream {
+    sfold = fold;
   }
 
 let of_array xs =
-  let fold red acc = Array.fold_left red.append acc xs in
-  {
-    fold = fold;
+  let fold red acc = Array.fold_left red acc xs in
+  Stream {
+    sfold = fold;
   }
 
 let of_array_i a =
   let fold red =
     let n = Array.length a in
     let get = Array.get a in
-    let comb = red.Fold.append in
     let rec loop i s =
       if i = n then s
-      else loop (i+1) (comb s (i,get i))
+      else loop (i+1) (red s (i,get i))
     in loop 0 
   in
-  {
-     Fold.fold = fold
+  Stream {
+     sfold = fold
   }
 
 let iterdir f path =
@@ -100,14 +99,14 @@ let foldfiles comb seed path =
 let of_files ?(recursive = true) path = 
   if recursive
   then
-    let fold red seed = recfoldfiles red.append seed path in
-    {
-      fold = fold
+    let fold red seed = recfoldfiles red seed path in
+    Stream {
+      sfold = fold
     }
   else
-    let fold red seed = foldfiles red.append seed path in
-    {
-      fold = fold
+    let fold red seed = foldfiles red seed path in
+    Stream {
+      sfold = fold
     }
 
 (* [recfoldsubdirs comb seed directory] iterates recursively over all sub-dirs of the given [directory]. *)
@@ -135,14 +134,14 @@ let foldsubdirs comb seed path =
 let of_subdirs ?(recursive = true) path = 
   if recursive
   then
-    let fold red seed = recfoldsubdirs red.append seed path in
-    {
-      fold = fold
+    let fold red seed = recfoldsubdirs red seed path in
+    Stream {
+      sfold = fold
     }
   else
-    let fold red seed = foldsubdirs red.append seed path in
-    {
-      fold = fold
+    let fold red seed = foldsubdirs red seed path in
+    Stream {
+      sfold = fold
     }
 
 (* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
@@ -158,9 +157,9 @@ let fold_file_chunks size path comb seed =
      with  error -> close_in channel; raise error
 
 let of_file_chunks size path =
-  let fold red seed = fold_file_chunks size path red.append seed in
-  {
-    fold = fold
+  let fold red seed = fold_file_chunks size path red seed in
+  Stream {
+    sfold = fold
   }
 
 (** folds chars of substring. *)
@@ -186,10 +185,10 @@ let file_characters path comb seed =
      with  error -> close_in channel; raise error
 
 let of_file_chars path =
-  let fold red seed = file_characters path red.append seed in
-  {
-    fold = fold
-}
+  let fold red seed = file_characters path red seed in
+  Stream {
+    sfold = fold
+  }
 
 (* string processing *)
 let token_combiner is_sep seed comb term =
@@ -219,14 +218,14 @@ let tokens is_sep file comb seed =
 (* [words path comb seed] iterates over all words of the file with the given [path]. *)
 let of_file_words path =
   let sep c = not (isalpha c) in
-  let fold red = tokens sep path red.append in
-  {
-    fold = fold
+  let fold red = tokens sep path red in
+  Stream {
+    sfold = fold
   }
 
 let of_file_lines path =
   let sep c = c = '\n' in
-  let fold red seed = tokens sep path red.append seed in
-  {
-    fold = fold
+  let fold red seed = tokens sep path red seed in
+  Stream {
+    sfold = fold
   }
