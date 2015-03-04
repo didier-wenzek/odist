@@ -40,7 +40,7 @@ type ('a,'b,'c) red = {
   - or as a grouping of sub collections to be processed independently.
 *)
 type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
-type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a col pfoldable
+type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a Odist_stream.src pfoldable
 
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'b,'c) red -> 'a col -> 'c

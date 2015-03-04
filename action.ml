@@ -33,8 +33,16 @@ let sstream sys =
     Odist_stream.full = None;
   }
 
+let sreduce red =
+  Odist_stream.stream {
+    Odist_stream.init = (fun () -> let seed = red.empty () in (seed,nop));
+    Odist_stream.push = red.append;
+    Odist_stream.term = red.result;
+    Odist_stream.full = red.maximum;
+  }
+
 let pstream sys xss =
-  let fold hdl = xss.pfold (fun xs -> reduce sys.reducer xs |> Odist_stream.of_single) sys.push hdl in
+  let fold hdl = xss.pfold (fun xs -> sreduce sys.reducer xs |> Odist_stream.of_single) sys.push hdl in
   let hdl = sys.init () in
   let finally () = sys.term hdl in
   ignore (protect ~finally fold hdl)

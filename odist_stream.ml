@@ -67,7 +67,7 @@ let collect red = red.collect
   This sfold value has type ('c -> 'd -> 'c) -> 'c -> 'c
   which is less general than 'b. ('b -> 'a -> 'b) -> 'b -> 'b
 
-  => all source as to be explicitly defined.
+  => all source has to be explicitly defined.
 
   let of_fold fold = Stream { sfold = fold; }
 *)

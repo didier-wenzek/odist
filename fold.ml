@@ -2,7 +2,7 @@ open Util
 open Infix
 
 type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
-type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a col pfoldable
+type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a Odist_stream.src pfoldable
 
 type ('a,'b,'c) red = {
   empty: unit -> 'b;
@@ -24,35 +24,35 @@ type 'a monoid = ('a,'a,'a) red
 let reduce red col =
   let acc = match red.maximum with
     | None -> (
-      let rec loop = function
-        | Stream xs -> Odist_stream.fold red.append (red.empty ()) xs
-        | Parcol xss -> xss.pfold (fun xs -> loop xs |> Odist_stream.of_single) red.merge (red.empty ())
-      in loop col
+      let fold xs = Odist_stream.fold red.append (red.empty ()) xs in
+      match col with
+        | Stream xs -> fold xs
+        | Parcol xss -> xss.pfold (fun xs -> fold xs |> Odist_stream.of_single) red.merge (red.empty ())
     )
     | Some(maximum) -> with_return (fun return ->
       let append_or_return acc i = if maximum acc then return acc else red.append acc i in
       let merge_or_return a b = if maximum a then return a else red.merge a b in
-      let rec loop = function
-        | Stream xs -> Odist_stream.fold append_or_return (red.empty ()) xs
-        | Parcol xss -> xss.pfold (fun xs -> loop xs |> Odist_stream.of_single) merge_or_return (red.empty ())
-      in loop col
+      let fold xs = Odist_stream.fold append_or_return (red.empty ()) xs in
+      match col with
+        | Stream xs -> fold xs
+        | Parcol xss -> xss.pfold (fun xs -> fold xs |> Odist_stream.of_single) merge_or_return (red.empty ())
     )
   in
   red.result acc
 
 let pmap f xss = { pfold = (fun g -> xss.pfold (fun xs -> g (f xs))) }
-let rec map f = function
+let map f = function
   | Stream xs -> Stream (Odist_stream.map f xs)
-  | Parcol xss -> Parcol (pmap (map f) xss)
+  | Parcol xss -> Parcol (pmap (Odist_stream.map f) xss)
 
-let rec filter p = function
+let filter p = function
   | Stream xs -> Stream (Odist_stream.filter p xs)
-  | Parcol xss -> Parcol (pmap (filter p) xss)
+  | Parcol xss -> Parcol (pmap (Odist_stream.filter p) xss)
 
-let rec to_stream = function
+let to_stream = function
   | Stream xs -> xs
   | Parcol xss -> Odist_stream.Stream {
-     Odist_stream.sfold = (fun comb -> xss.pfold to_stream comb)
+     Odist_stream.sfold = (fun comb -> xss.pfold id comb)
   }
 
 let fold comb seed col = to_stream col |> Odist_stream.fold comb seed 
@@ -61,18 +61,18 @@ let sflatmap f xs =
   Odist_stream.Stream {
     Odist_stream.sfold = (fun comb seed -> Odist_stream.fold (fun acc x -> fold comb acc (f x)) seed xs)
   }
-let rec flatmap f = function
+let flatmap f = function
   | Stream xs -> Stream (sflatmap f xs)
-  | Parcol xss -> Parcol (pmap (flatmap f) xss)
+  | Parcol xss -> Parcol (pmap (sflatmap f) xss)
 
 let sunnest f xs =
   Odist_stream.Stream {
     Odist_stream.sfold = (fun comb seed -> Odist_stream.fold (fun acc x -> fold (fun a i -> comb a (x,i)) acc (f x)) seed xs)
   }
 
-let rec unnest f = function
+let unnest f = function
   | Stream xs -> Stream (sunnest f xs)
-  | Parcol xss -> Parcol (pmap (unnest f) xss)
+  | Parcol xss -> Parcol (pmap (sunnest f) xss)
 
 let col_product l_col r_col pair =
   let append_pair append l_item acc r_item = append acc (pair l_item r_item) in
@@ -81,9 +81,9 @@ let col_product l_col r_col pair =
       Odist_stream.sfold = (fun append seed -> Odist_stream.fold (append_pairs append) seed xs)
     }
   in
-  let rec product = function
+  let product = function
     | Stream xs -> Stream (sproduct xs)
-    | Parcol xss -> Parcol (pmap product xss)
+    | Parcol xss -> Parcol (pmap sproduct xss)
   in
   product l_col
 

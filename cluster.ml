@@ -224,7 +224,7 @@ end = struct
        let channel_B = make_channel_name ipcdir in
        begin
          launch_bg 1 size (fun cluster -> col |> to_stream |> stream_to_channel cluster channel_A);
-         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> fun xs -> Stream xs |> part_reducer |> stream_to_channel cluster channel_B);
+         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> part_reducer |> stream_to_channel cluster channel_B);
          launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Odist_stream.fold comb_reducer seed)
        end
     in
@@ -244,7 +244,7 @@ end = struct
        let channel_B = make_channel_name ipcdir in
        begin
          launch_bg 1 size (fun cluster -> col |> to_stream |> stream_to_channel cluster channel_A);
-         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> fun xs -> Stream xs |> part_reducer |> stream_to_channel cluster channel_B);
+         launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> part_reducer |> stream_to_channel cluster channel_B);
          launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Odist_stream.fold comb_reducer seed)
        end
     in
