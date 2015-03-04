@@ -39,14 +39,16 @@ type ('a,'b,'c) red = {
   - either as a stream using a fold function à la [List.fold_left]
   - or as a grouping of sub collections to be processed independently.
 *)
-type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
-type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a Odist_stream.src pfoldable
+type 'a sfoldable = 'a Odist_stream.src
+type 'a pfoldable = { pfold: 'b. ('a sfoldable -> 'b sfoldable) -> 'b sfoldable }
+type 'a col = Stream of 'a sfoldable | Parcol of 'a pfoldable
 
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'b,'c) red -> 'a col -> 'c
 
 val to_stream : 'a col -> 'a Odist_stream.src
 val fold: ('b -> 'a -> 'b) -> 'b -> 'a col -> 'b
+val collect_stream: ('a,'b,'c) red -> 'a Odist_stream.src -> 'b Odist_stream.src
 
 val map: ('a -> 'b) -> 'a col -> 'b col
 val flatmap: ('a -> 'b col) -> 'a col -> 'b col

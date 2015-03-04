@@ -229,7 +229,7 @@ end = struct
        end
     in
     Parcol {
-       pfold = par_fold
+       pfold = (fun part_reducer -> Odist_stream.Stream { Odist_stream.sfold = (fun comb_reducer -> par_fold part_reducer comb_reducer) })
     }
 
   let fair_distribute ipcdir size col =
@@ -249,7 +249,7 @@ end = struct
        end
     in
     Parcol {
-       pfold = par_fold
+       pfold = (fun part_reducer -> Odist_stream.Stream { Odist_stream.sfold = (fun comb_reducer -> par_fold part_reducer comb_reducer) })
     }
 end
  

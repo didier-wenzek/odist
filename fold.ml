@@ -1,8 +1,9 @@
 open Util
 open Infix
 
-type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
-type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a Odist_stream.src pfoldable
+type 'a sfoldable = 'a Odist_stream.src
+type 'a pfoldable = { pfold: 'b. ('a sfoldable -> 'b sfoldable) -> 'b sfoldable }
+type 'a col = Stream of 'a sfoldable | Parcol of 'a pfoldable
 
 type ('a,'b,'c) red = {
   empty: unit -> 'b;
@@ -21,24 +22,33 @@ type ('a,'m,'s) action = {
 
 type 'a monoid = ('a,'a,'a) red
 
-let reduce red col =
-  let acc = match red.maximum with
-    | None -> (
-      let fold xs = Odist_stream.fold red.append (red.empty ()) xs in
-      match col with
-        | Stream xs -> fold xs
-        | Parcol xss -> xss.pfold (fun xs -> fold xs |> Odist_stream.of_single) red.merge (red.empty ())
-    )
-    | Some(maximum) -> with_return (fun return ->
-      let append_or_return acc i = if maximum acc then return acc else red.append acc i in
-      let merge_or_return a b = if maximum a then return a else red.merge a b in
-      let fold xs = Odist_stream.fold append_or_return (red.empty ()) xs in
-      match col with
-        | Stream xs -> fold xs
-        | Parcol xss -> xss.pfold (fun xs -> fold xs |> Odist_stream.of_single) merge_or_return (red.empty ())
-    )
-  in
-  red.result acc
+let stream_append red =
+  Odist_stream.stream {
+    Odist_stream.init = (fun () -> let seed = red.empty () in (seed,nop));
+    Odist_stream.push = red.append;
+    Odist_stream.term = red.result;
+    Odist_stream.full = red.maximum;
+  }
+
+let collect_stream red =
+  Odist_stream.stream {
+    Odist_stream.init = (fun () -> let seed = red.empty () in (seed,nop));
+    Odist_stream.push = red.append;
+    Odist_stream.term = Odist_stream.of_single;
+    Odist_stream.full = red.maximum;
+  }
+
+let stream_merge red =
+  Odist_stream.stream {
+    Odist_stream.init = (fun () -> let seed = red.empty () in (seed,nop));
+    Odist_stream.push = red.merge;
+    Odist_stream.term = red.result;
+    Odist_stream.full = red.maximum;
+  }
+
+let reduce red = function
+  | Stream xs -> stream_append red xs
+  | Parcol xss -> xss.pfold (collect_stream red) |> stream_merge red
 
 let pmap f xss = { pfold = (fun g -> xss.pfold (fun xs -> g (f xs))) }
 let map f = function
@@ -51,9 +61,7 @@ let filter p = function
 
 let to_stream = function
   | Stream xs -> xs
-  | Parcol xss -> Odist_stream.Stream {
-     Odist_stream.sfold = (fun comb -> xss.pfold id comb)
-  }
+  | Parcol xss -> xss.pfold id
 
 let fold comb seed col = to_stream col |> Odist_stream.fold comb seed 
 

@@ -33,23 +33,17 @@ let sstream sys =
     Odist_stream.full = None;
   }
 
-let sreduce red =
+let pstream sys =
   Odist_stream.stream {
-    Odist_stream.init = (fun () -> let seed = red.empty () in (seed,nop));
-    Odist_stream.push = red.append;
-    Odist_stream.term = red.result;
-    Odist_stream.full = red.maximum;
+    Odist_stream.init = (fun () -> let hdl = sys.init () in (hdl,fun () -> sys.term hdl));
+    Odist_stream.push = sys.push;
+    Odist_stream.term = (fun _ -> ());
+    Odist_stream.full = None;
   }
-
-let pstream sys xss =
-  let fold hdl = xss.pfold (fun xs -> sreduce sys.reducer xs |> Odist_stream.of_single) sys.push hdl in
-  let hdl = sys.init () in
-  let finally () = sys.term hdl in
-  ignore (protect ~finally fold hdl)
 
 let stream sys = function
   | Stream xs -> sstream sys xs
-  | Parcol xss -> pstream sys xss
+  | Parcol xss -> xss.pfold (collect_stream sys.reducer) |> pstream sys
 
 let to_printer = {
   reducer = Red.to_string_buffer 64;
