@@ -36,8 +36,8 @@ type ('a,'b,'c) red = {
 (** A value of type ['a col] abstract a collection of ['a] items.
 
   A dataset is only defined indirectly by the ability to fold its content,
-  - either as stream using a fold function à la [List.fold_left]
-  - or as grouping of sub collections to be processed independently.
+  - either as a stream using a fold function à la [List.fold_left]
+  - or as a grouping of sub collections to be processed independently.
 *)
 type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
 type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a col pfoldable

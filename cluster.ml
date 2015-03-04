@@ -53,9 +53,8 @@ module ZmqPullPushCores : sig
   *)
   val scatter: t -> string -> (int*string,outfan,unit) Odist_stream.sink
   
-  val allotting_with: ('a -> int) -> (int*'a,outfan,unit) Odist_stream.sink -> ('a,outfan,unit) Odist_stream.sink
-  
-  val using_roundrobin: (int*'a,outfan,unit) Odist_stream.sink -> ('a,int*outfan,unit) Odist_stream.sink
+  val allot_with: ('a -> int) -> 'a Odist_stream.src -> (int*'a) Odist_stream.src
+  val roundrobin: string Odist_stream.src -> (int*string) Odist_stream.src
   
   (**
     [gather cluster channel_name] gathers (node,message) of type (int,string) received from the cluster on the given channel.
@@ -180,6 +179,12 @@ end = struct
       sink with
       push = (fun hdl item -> sink.push hdl (hash item,item));
     }
+
+  let allot_with hash msgs =
+    let adapt sink = allotting_with hash sink in
+    Odist_stream.Transf {
+       Odist_stream.tfold = (fun sink -> msgs |> Odist_stream.stream (adapt sink))
+    }
   
   let using_roundrobin sink =
     Odist_stream.{
@@ -189,6 +194,11 @@ end = struct
       full = match sink.full with
         | None -> None
         | Some(maximum) -> Some (fun (_,hdl) -> maximum hdl);
+    }
+
+  let roundrobin msgs =
+    Odist_stream.Transf {
+       Odist_stream.tfold = (fun sink -> msgs |> Odist_stream.stream (using_roundrobin sink))
     }
 
   let ignoring_order sink =
@@ -208,7 +218,7 @@ end = struct
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
-    let stream_to_channel cluster name = Odist_stream.map encode >> Odist_stream.stream (scatter cluster name |> using_roundrobin) in
+    let stream_to_channel cluster name = Odist_stream.map encode >> roundrobin >> Odist_stream.stream (scatter cluster name) in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
