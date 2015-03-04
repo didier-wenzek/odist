@@ -1,9 +1,8 @@
 open Util
 open Infix
 
-type 'a sfoldable = { sfold: 'b. ('b -> 'a -> 'b) -> 'b -> 'b }
-type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b sfoldable) -> ('c -> 'b -> 'c) -> 'c -> 'c }
-type 'a col = Stream of 'a sfoldable | Parcol of 'a col pfoldable
+type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
+type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a col pfoldable
 
 type ('a,'b,'c) red = {
   empty: unit -> 'b;
@@ -22,51 +21,55 @@ type ('a,'m,'s) action = {
 
 type 'a monoid = ('a,'a,'a) red
 
-let ssingle x = { sfold = (fun comb acc -> comb acc x) }
-
 let reduce red col =
   let acc = match red.maximum with
     | None -> (
       let rec loop = function
-        | Stream xs -> xs.sfold red.append (red.empty ())
-        | Parcol xss -> xss.pfold (fun xs -> loop xs |> ssingle) red.merge (red.empty ())
+        | Stream xs -> Odist_stream.fold red.append (red.empty ()) xs
+        | Parcol xss -> xss.pfold (fun xs -> loop xs |> Odist_stream.of_single) red.merge (red.empty ())
       in loop col
     )
     | Some(maximum) -> with_return (fun return ->
       let append_or_return acc i = if maximum acc then return acc else red.append acc i in
       let merge_or_return a b = if maximum a then return a else red.merge a b in
       let rec loop = function
-        | Stream xs -> xs.sfold append_or_return (red.empty ())
-        | Parcol xss -> xss.pfold (fun xs -> loop xs |> ssingle) merge_or_return (red.empty ())
+        | Stream xs -> Odist_stream.fold append_or_return (red.empty ()) xs
+        | Parcol xss -> xss.pfold (fun xs -> loop xs |> Odist_stream.of_single) merge_or_return (red.empty ())
       in loop col
     )
   in
   red.result acc
 
-let smap f xs = { sfold = (fun comb -> xs.sfold (fun acc x -> comb acc (f x))) }
 let pmap f xss = { pfold = (fun g -> xss.pfold (fun xs -> g (f xs))) }
 let rec map f = function
-  | Stream xs -> Stream (smap f xs)
+  | Stream xs -> Stream (Odist_stream.map f xs)
   | Parcol xss -> Parcol (pmap (map f) xss)
 
-let sfilter p xs = { sfold = (fun comb -> xs.sfold (fun acc x -> if p x then comb acc x else acc)) }
 let rec filter p = function
-  | Stream xs -> Stream (sfilter p xs)
+  | Stream xs -> Stream (Odist_stream.filter p xs)
   | Parcol xss -> Parcol (pmap (filter p) xss)
 
-let rec to_sfoldable = function
+let rec to_stream = function
   | Stream xs -> xs
-  | Parcol xss -> { sfold = (fun comb -> xss.pfold to_sfoldable comb)}
+  | Parcol xss -> Odist_stream.Stream {
+     Odist_stream.sfold = (fun comb -> xss.pfold to_stream comb)
+  }
 
-let sfold comb seed col = col.sfold comb seed
-let fold comb seed col = (to_sfoldable col).sfold comb seed
+let fold comb seed col = to_stream col |> Odist_stream.fold comb seed 
 
-let sflatmap f xs = { sfold = (fun comb -> xs.sfold (fun acc x -> fold comb acc (f x))) }
+let sflatmap f xs =
+  Odist_stream.Stream {
+    Odist_stream.sfold = (fun comb seed -> Odist_stream.fold (fun acc x -> fold comb acc (f x)) seed xs)
+  }
 let rec flatmap f = function
   | Stream xs -> Stream (sflatmap f xs)
   | Parcol xss -> Parcol (pmap (flatmap f) xss)
 
-let sunnest f xs = { sfold = (fun comb -> xs.sfold (fun acc x -> fold (fun a i -> comb a (x,i)) acc (f x))) }
+let sunnest f xs =
+  Odist_stream.Stream {
+    Odist_stream.sfold = (fun comb seed -> Odist_stream.fold (fun acc x -> fold (fun a i -> comb a (x,i)) acc (f x)) seed xs)
+  }
+
 let rec unnest f = function
   | Stream xs -> Stream (sunnest f xs)
   | Parcol xss -> Parcol (pmap (unnest f) xss)
@@ -74,7 +77,10 @@ let rec unnest f = function
 let col_product l_col r_col pair =
   let append_pair append l_item acc r_item = append acc (pair l_item r_item) in
   let append_pairs append acc x = fold (append_pair append x) acc r_col in
-  let sproduct xs = { sfold = (fun append -> xs.sfold (append_pairs append)) } in
+  let sproduct xs = Odist_stream.Stream {
+      Odist_stream.sfold = (fun append seed -> Odist_stream.fold (append_pairs append) seed xs)
+    }
+  in
   let rec product = function
     | Stream xs -> Stream (sproduct xs)
     | Parcol xss -> Parcol (pmap product xss)

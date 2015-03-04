@@ -25,22 +25,23 @@ let term_with term c = match c with
   | State s -> term s
   | _ -> assert false
 
-let ssingle x = { sfold = (fun comb acc -> comb acc x) }
+let sstream sys =
+  Odist_stream.stream {
+    Odist_stream.init = (fun () -> let hdl = sys.init () in (hdl,fun () -> sys.term hdl));
+    Odist_stream.push = sys.push_item;
+    Odist_stream.term = (fun _ -> ());
+    Odist_stream.full = None;
+  }
 
-let sstream sys xs =
-  let fold hdl = ignore (xs.sfold sys.push_item hdl) in
+let pstream sys xss =
+  let fold hdl = xss.pfold (fun xs -> reduce sys.reducer xs |> Odist_stream.of_single) sys.push hdl in
   let hdl = sys.init () in
   let finally () = sys.term hdl in
-  protect ~finally fold hdl
+  ignore (protect ~finally fold hdl)
 
-let stream sys col =
-  let fold hdl = function
-    | Stream xs -> xs.sfold sys.push_item hdl
-    | Parcol xss -> xss.pfold (fun xs -> reduce sys.reducer xs |> ssingle) sys.push hdl
-  in
-  let hdl = sys.init () in
-  let finally () = sys.term hdl in
-  ignore (protect ~finally (fold hdl) col)
+let stream sys = function
+  | Stream xs -> sstream sys xs
+  | Parcol xss -> pstream sys xss
 
 let to_printer = {
   reducer = Red.to_string_buffer 64;

@@ -113,10 +113,10 @@ module SetRed(S: Set.S) = struct
     maximum = None;
   }
 
-  let items xs =
-  Stream {
-     sfold = (fun red acc -> S.fold (fun x xs -> red xs x) xs acc);
-  }
+  let items xs = Stream (
+    Odist_stream.Stream {
+      Odist_stream.sfold = (fun red acc -> S.fold (fun x xs -> red xs x) xs acc);
+    })
 end
 
 module MakeSetRed(E: Set.OrderedType) = SetRed(Set.Make(E))
@@ -151,10 +151,10 @@ module MapRed(M: Map.S) = struct
   let grouping_by k reducer = mapping (fun x -> (k x,x)) (grouping_with reducer) 
   let grouping reducer = mapping (fun x -> (x,x)) (grouping_with reducer)
 
-  let pairs m =
-    Stream {
-      sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) m acc);
-    }
+  let pairs m = Stream (
+    Odist_stream.Stream {
+      Odist_stream.sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) m acc);
+    })
 end
 
 module MakeMapRed(E: Map.OrderedType) = MapRed(Map.Make(E))

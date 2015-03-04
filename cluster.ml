@@ -51,19 +51,19 @@ module ZmqPullPushCores : sig
     In practice this action, has to be adapted to encode values and to allot them to nodes of the cluster.
     [my_collection |> stream_to (scatter cluster channel_name |> allotting_with hash)]
   *)
-  val scatter: t -> string -> (int*string, (int*string) list,outfan) action
+  val scatter: t -> string -> (int*string,outfan,unit) Odist_stream.sink
   
-  val allotting_with: ('a -> int) -> (int*'a,'b,outfan) action -> ('a,'b,outfan) action
+  val allotting_with: ('a -> int) -> (int*'a,outfan,unit) Odist_stream.sink -> ('a,outfan,unit) Odist_stream.sink
   
-  val using_roundrobin: (int*'a,'b,outfan) action -> ('a,'a list,int*outfan) action
+  val using_roundrobin: (int*'a,outfan,unit) Odist_stream.sink -> ('a,int*outfan,unit) Odist_stream.sink
   
   (**
     [gather cluster channel_name] gathers (node,message) of type (int,string) received from the cluster on the given channel.
     The gathering ends when all nodes of the cluster has called the [term ()] method of scattering action.
   *)
-  val gather: t -> string -> (int * string) Fold.sfoldable
+  val gather: t -> string -> (int * string) Odist_stream.src
   
-  val ignore_order: (int * string) Fold.sfoldable -> string Fold.sfoldable
+  val ignore_order: (int * string) Odist_stream.src -> string Odist_stream.src
 
   (** [col |> distribute ipcdir node_count] distributes the elements of a collection over the cluster nodes.*)
   val distribute: string -> int -> 'a Fold.col -> 'a Fold.col
@@ -106,26 +106,17 @@ end = struct
   let close this_node outfan =
     Zmq.send_multiparts outfan ["E"; this_node]; Zmq.close outfan
   
-  let revlist_reducer = {
-         empty = (fun () -> []);
-         append = (fun xs x -> x::xs); 
-         merge = (fun xs ys -> ys @ xs);
-         result = id;
-         maximum = None; 
-       }
-  let fold_revlist push = (fun acc xs -> let xs = List.rev xs in List.fold_left push acc xs)
-
   let scatter cluster channel_name  =
     let connect_outfan = connect_outfan cluster channel_name in
     let close_outfan = close cluster.this_node in
     let connect () = Array.init cluster.size connect_outfan in
     let push outfans (node,msg) = send cluster.this_node msg outfans.(node mod cluster.size);outfans in
+    let close outfans = fun () -> Array.iter close_outfan outfans in
     {
-       reducer = revlist_reducer;
-       init = connect;
-       push_item = push;
-       push = fold_revlist push;
-       term = Array.iter close_outfan;
+      Odist_stream.init = (fun () -> let hdl = connect () in (hdl, close hdl)); 
+      Odist_stream.push = push;
+      Odist_stream.term = ignore;
+      Odist_stream.full = None
     }
   
   let connect_outfan cluster channel_name point =
@@ -146,13 +137,14 @@ end = struct
       result = id;
       maximum = None;
     } in
+    let connect () = Col.of_range 0 (cluster.size -1) |> reduce to_outfan_connector in
+    let close outfans () = close cluster.this_node outfans in
     let push outfan msg = send cluster.this_node msg outfan;outfan in
     {
-       reducer = revlist_reducer;
-       init = (fun () -> Col.of_range 0 (cluster.size -1) |> reduce to_outfan_connector);
-       push_item = push;
-       push = fold_revlist push;
-       term = close cluster.this_node;
+      Odist_stream.init = (fun () -> let hdl = connect () in (hdl, close hdl)); 
+      Odist_stream.push = push;
+      Odist_stream.term = ignore;
+      Odist_stream.full = None
     }
   
   let gather_fold cluster channel_name append acc =
@@ -179,34 +171,35 @@ end = struct
   
   let gather cluster channel_name =
     let fold red acc = gather_fold cluster channel_name red acc in
-    {
-      sfold = fold;
+    Odist_stream.Stream {
+      Odist_stream.sfold = fold;
     }
 
-  let allotting_with hash action =
-    let pair_with_hash item = (hash item,item) in
-    let allot_than_act s item = action.push_item s (hash item,item) in
-    {
-       action with
-       reducer = mapping pair_with_hash action.reducer;
-       push_item = allot_than_act;
+  let allotting_with hash sink =
+    Odist_stream.{
+      sink with
+      push = (fun hdl item -> sink.push hdl (hash item,item));
     }
   
-  let using_roundrobin action =
-    let allot_than_act (lot,state) item = (lot+1, action.push_item state (lot,item)) in
-    {
-       reducer = revlist_reducer;
-       init = (fun () -> (0,action.init ()));
-       push_item = allot_than_act;
-       push = fold_revlist allot_than_act;
-       term = (fun (_,state) -> action.term state);
+  let using_roundrobin sink =
+    Odist_stream.{
+      init = (fun () -> let hdl,close = sink.init () in ((0,hdl),close)); 
+      push = (fun (lot,hdl) item -> (lot+1, sink.push hdl (lot,item)));
+      term = (fun (_,hdl) -> sink.term hdl);
+      full = match sink.full with
+        | None -> None
+        | Some(maximum) -> Some (fun (_,hdl) -> maximum hdl);
+    }
+
+  let ignoring_order sink =
+    Odist_stream.{
+      sink with
+      push = (fun hdl (_,msg) -> sink.Odist_stream.push hdl msg)
     }
 
   let ignore_order node_msg_pairs =
-    let ignoring_order red = (fun acc (_,msg) -> red acc msg); in
-    let fold red = node_msg_pairs.sfold (ignoring_order red) in
-    {
-       sfold = fold
+    Odist_stream.Transf {
+       Odist_stream.tfold = (fun sink -> node_msg_pairs |> Odist_stream.stream (ignoring_order sink))
     }
   
   let distribute ipcdir size col =
@@ -214,15 +207,15 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let gather_from_channel cluster name = gather cluster name |> ignore_order |> smap decode in
-    let stream_to_channel cluster name = smap encode >> sstream (scatter cluster name |> using_roundrobin) in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
+    let stream_to_channel cluster name = Odist_stream.map encode >> Odist_stream.stream (scatter cluster name |> using_roundrobin) in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
-         launch_bg 1 size (fun cluster -> col |> to_sfoldable |> stream_to_channel cluster channel_A);
+         launch_bg 1 size (fun cluster -> col |> to_stream |> stream_to_channel cluster channel_A);
          launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> fun xs -> Stream xs |> part_reducer |> stream_to_channel cluster channel_B);
-         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> sfold comb_reducer seed)
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Odist_stream.fold comb_reducer seed)
        end
     in
     Parcol {
@@ -234,15 +227,15 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = smap encode >> sstream (fair_scatter cluster name) in
-    let gather_from_channel cluster name = gather cluster name |> ignore_order |> smap decode in
+    let stream_to_channel cluster name = Odist_stream.map encode >> Odist_stream.stream (fair_scatter cluster name) in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
-         launch_bg 1 size (fun cluster -> col |> to_sfoldable |> stream_to_channel cluster channel_A);
+         launch_bg 1 size (fun cluster -> col |> to_stream |> stream_to_channel cluster channel_A);
          launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> fun xs -> Stream xs |> part_reducer |> stream_to_channel cluster channel_B);
-         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> sfold comb_reducer seed)
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Odist_stream.fold comb_reducer seed)
        end
     in
     Parcol {

@@ -36,22 +36,17 @@ type ('a,'b,'c) red = {
 (** A value of type ['a col] abstract a collection of ['a] items.
 
   A dataset is only defined indirectly by the ability to fold its content,
-  - either using a [sfold] function à la [List.fold_left]
+  - either as stream using a fold function à la [List.fold_left]
   - or as grouping of sub collections to be processed independently.
 *)
-type 'a sfoldable = { sfold: 'b. ('b -> 'a -> 'b) -> 'b -> 'b }
-type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b sfoldable) -> ('c -> 'b -> 'c) -> 'c -> 'c }
-type 'a col = Stream of 'a sfoldable | Parcol of 'a col pfoldable
+type 'a pfoldable = { pfold: 'b 'c. ('a -> 'b Odist_stream.src) -> ('c -> 'b -> 'c) -> 'c -> 'c }
+type 'a col = Stream of 'a Odist_stream.src | Parcol of 'a col pfoldable
 
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'b,'c) red -> 'a col -> 'c
 
-val to_sfoldable : 'a col -> 'a sfoldable
+val to_stream : 'a col -> 'a Odist_stream.src
 val fold: ('b -> 'a -> 'b) -> 'b -> 'a col -> 'b
-
-val sfold: ('b -> 'a -> 'b) -> 'b -> 'a sfoldable -> 'b
-val smap: ('a -> 'b) -> 'a sfoldable -> 'b sfoldable
-val sfilter: ('a -> bool) -> 'a sfoldable -> 'a sfoldable
 
 val map: ('a -> 'b) -> 'a col -> 'b col
 val flatmap: ('a -> 'b col) -> 'a col -> 'b col

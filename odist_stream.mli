@@ -17,6 +17,7 @@ type ('a,'b,'c,'cs) red = {
 }
 
 val stream: ('a,'b,'c) sink -> 'a src -> 'c
+val fold: ('b -> 'a -> 'b) -> 'b -> 'a src -> 'b
 val reduce: ('a,'b,'c,'cs) red -> 'a src -> 'cs
 val collect: ('a,'b,'c,'cs) red -> 'a src -> 'c src
 
@@ -32,6 +33,9 @@ val monoid: 'a -> ('a->'a->'a) -> ('a,'a,'a,'a) red
 val display_current: (string,unit,unit) sink
 
 val map: ('a->'b) -> 'a src -> 'b src
+val filter: ('a->bool) -> 'a src -> 'a src
+
+val of_single: 'a -> 'a src
 
 val to_list: ('a,'a list,'a,'a list) red
 val of_list: 'a list -> 'a src

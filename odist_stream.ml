@@ -32,8 +32,45 @@ let stream sink = function
     let hdl,finally = sink.init () in
     protect ~finally fold hdl
 
+let init_value e = (fun () -> e,nop)
+
+let fold comb seed = function
+  | Stream xs -> xs.sfold comb seed
+  | Transf xs -> xs.tfold {
+    init = init_value seed;
+    push = comb;
+    term = id;
+    full = None; 
+  }
+
 let reduce red = stream red.reduce
 let collect red = red.collect
+
+(* This fail to compile !
+
+  The tfold field value has type ('d, 'e, 'f) sink -> 'f
+  which is less general than 'b 'c. ('a, 'b, 'c) sink -> 'c
+
+  => the transformation has to be done for each stream sink adapter:
+  mapping -> map, filtering -> filter, taking -> take, ...
+   
+
+  let apply_stream_adapter adapt xs =
+    let fold sink = stream (adapt sink) xs in
+    Transf {
+       tfold = fold
+    }
+*)
+  
+(* This fails to compile too !
+
+  This sfold value has type ('c -> 'd -> 'c) -> 'c -> 'c
+  which is less general than 'b. ('b -> 'a -> 'b) -> 'b -> 'b
+
+  => all source as to be explicitly defined.
+
+  let of_fold fold = Stream { sfold = fold; }
+*)
 
 let take n xs =
   let adapt sink = {
@@ -114,8 +151,6 @@ let integers =
     sfold = fold;
   }
 
-let init_value e = (fun () -> e,nop)
-
 let of_single x = Stream { sfold = (fun push seed -> push seed x) }
 let collect_single sink = fun xs -> xs |> stream sink |> of_single
 
@@ -145,6 +180,16 @@ let mapping f sink = {
 let map f xs =
   Transf {
     tfold = (fun sink -> xs |> stream (mapping f sink))
+  }
+
+let filtering p sink = {
+    sink with
+    push = (fun acc x -> if p x then sink.push acc x else acc)
+  }
+
+let filter q xs =
+  Transf {
+    tfold = (fun sink -> xs |> stream (filtering q sink))
   }
 
 module type SET = sig
@@ -195,7 +240,7 @@ module SetRed(S: Set.S): SET with type t = S.t and type elt = S.elt = struct
 end
 
 let list_reducer = {
-  init = (fun () -> ([],nop));
+  init = (fun () -> [],nop);
   push = (fun xs x -> x::xs);
   term = (fun xs -> List.rev xs);
   full = None;

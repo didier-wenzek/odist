@@ -44,7 +44,7 @@ type ('a,'m,'s) action = {
    Finally the system resources are released using the term function returned by [action.init ()].
 *)
 val stream : ('a,'m,'b) action -> 'a Fold.col -> unit
-val sstream : ('a,'m,'b) action -> 'a Fold.sfoldable -> unit
+val sstream : ('a,'m,'b) action -> 'a Odist_stream.src -> unit
 
 (* Printing action of a stream of strings on standard output. *)
 val to_printer : (string, Buffer.t, unit) action
