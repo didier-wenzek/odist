@@ -1,3 +1,4 @@
+module Fold = Odist_fold
 open Unix
 open Fold
 

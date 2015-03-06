@@ -1,5 +1,7 @@
 (** Collections *)
 
+module Fold = Odist_fold
+
 val empty: 'a Fold.col
 (* The empty collection. *)
 

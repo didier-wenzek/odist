@@ -1,5 +1,7 @@
 (** Text processing. *)
 
+module Fold = Odist_fold
+
 (** Internal representation of text split in parts to be processed. *)
 type 'a split
 

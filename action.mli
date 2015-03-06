@@ -1,3 +1,5 @@
+module Fold = Odist_fold
+
 (* An action wraps a statefull and/or effectfull system.
 
    It works around a monoid and a system on which the monoid values act.

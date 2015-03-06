@@ -1,5 +1,6 @@
 module Infix = Odist_infix
 module Stream = Odist_stream
+module Fold = Odist_fold
 open Fold
 open Infix
 

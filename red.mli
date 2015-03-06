@@ -1,5 +1,6 @@
 (** Reducers *)
 
+module Fold = Odist_fold
 open Fold
 
 val and_reducer: (bool, bool, bool, bool) red

@@ -1,5 +1,8 @@
 open Odist
 open Infix
+open Fold
+open Red
+open Cluster
 
 let even n = n mod 2 == 0
 let square n = n * n
@@ -72,7 +75,7 @@ let _ =
   let s = Col.of_range 0 9 |> map string_of_int |> reduce to_string in
   assert ( s = "0123456789");
 
-  Col.of_range 1 100 |> map string_of_int |> flatmap (fun s -> Col.of_list [s;"\n"]) |> stream (to_file_printer "/tmp/foo");
+  Col.of_range 1 100 |> map string_of_int |> flatmap (fun s -> Col.of_list [s;"\n"]) |> Action.stream (Action.to_file_printer "/tmp/foo");
   let s = Col.of_file_lines "/tmp/foo" |> map int_of_string |> reduce sum in
   assert (s = 50 * 101 );
 
@@ -82,7 +85,7 @@ let _ =
   assert (s_par = s_seq);
 
   let split_lines = Str.split_delim (Str.regexp "\n") in
-  let to_lines = pack_split_reducer split_lines (to_list |> filtering (fun s -> s <> "")) in
+  let to_lines = Text.pack_split_reducer split_lines (to_list |> filtering (fun s -> s <> "")) in
   let expected = Col.of_range 1 100 |> map string_of_int |> reduce to_list in
   let file_lines_1 = "/tmp/foo" |> Col.of_file_chunks 20 |> reduce to_lines in
   let file_lines_2 = "/tmp/foo" |> Col.of_file_chunks 21 |> reduce to_lines in

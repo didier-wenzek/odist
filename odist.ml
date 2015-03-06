@@ -1,10 +1,11 @@
 (** OCaml distributed data processing *)
 
-include Fold
-include Red
-include Col
-include Text
-include Action
-include Cluster
 module Infix = Odist_infix
 module Stream = Odist_stream
+module Fold = Odist_fold
+
+module Red = Red
+module Col = Col
+module Text = Text
+module Action = Action
+module Cluster = Cluster

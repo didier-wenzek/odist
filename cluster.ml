@@ -1,5 +1,6 @@
 module Util = Odist_util
 module Infix = Odist_infix
+module Fold = Odist_fold
 open Action
 open Fold
 open Infix
