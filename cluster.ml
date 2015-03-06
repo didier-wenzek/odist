@@ -46,10 +46,10 @@ module ZmqPullPushCores : sig
     The message of a pair (node_id, msg) is sent to the node with the given id.
   
     [scatter cluster channel_name]
-    returns an action to be used to scatter all values of a collection over the channel.
+    returns a sink to be used to scatter all values of a collection over the channel.
   
-    In practice this action, has to be adapted to encode values and to allot them to nodes of the cluster.
-    [my_collection |> stream_to (scatter cluster channel_name |> allotting_with hash)]
+    In practice this sink, has to be adapted to encode values and to allot them to nodes of the cluster.
+    [my_collection |> allot_with hash |> stream (scatter cluster channel_name)]
   *)
   val scatter: t -> string -> (int*string,outfan,unit) Odist_stream.sink
   
@@ -58,7 +58,7 @@ module ZmqPullPushCores : sig
   
   (**
     [gather cluster channel_name] gathers (node,message) of type (int,string) received from the cluster on the given channel.
-    The gathering ends when all nodes of the cluster has called the [term ()] method of scattering action.
+    The gathering process ends when all nodes of the cluster has called the [term ()] method of they scattering sink.
   *)
   val gather: t -> string -> (int * string) Odist_stream.src
   

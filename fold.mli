@@ -66,7 +66,7 @@ val reduce: ('a,'m,'b,'c) red -> 'a col -> 'c
 
 val to_stream : 'a col -> 'a Odist_stream.src
 val fold: ('b -> 'a -> 'b) -> 'b -> 'a col -> 'b
-val collect_stream: ('a,'m,'b,'c) red -> 'a Odist_stream.src -> 'b Odist_stream.src
+val collect_stream: ('m, 'b) colmonoid -> ('m -> 'a -> 'm) -> 'a Odist_stream.src -> 'b Odist_stream.src
 
 val map: ('a -> 'b) -> 'a col -> 'b col
 val flatmap: ('a -> 'b col) -> 'a col -> 'b col

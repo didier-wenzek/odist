@@ -29,12 +29,12 @@ let stream_append red =
     Odist_stream.full = red.monoid.maximum;
   }
 
-let collect_stream red =
+let collect_stream monoid inject =
   Odist_stream.stream {
-    Odist_stream.init = (fun () -> let seed = red.monoid.empty () in (seed,nop));
-    Odist_stream.push = red.inject;
-    Odist_stream.term = red.monoid.items;
-    Odist_stream.full = red.monoid.maximum;
+    Odist_stream.init = (fun () -> let seed = monoid.empty () in (seed,nop));
+    Odist_stream.push = inject;
+    Odist_stream.term = monoid.items;
+    Odist_stream.full = monoid.maximum;
   }
 
 let stream_merge red =
@@ -47,7 +47,7 @@ let stream_merge red =
 
 let reduce red = function
   | Stream xs -> stream_append red xs
-  | Parcol xss -> xss.pfold (collect_stream red) |> stream_merge red
+  | Parcol xss -> xss.pfold (collect_stream red.monoid red.inject) |> stream_merge red
 
 let pmap f xss = { pfold = (fun g -> xss.pfold (fun xs -> g (f xs))) }
 let map f = function
