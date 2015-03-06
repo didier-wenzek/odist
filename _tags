@@ -1,4 +1,4 @@
-<cluster.ml>: package(ozmq)
+<odist_cluster.ml>: package(ozmq)
 <tests.ml>: package(ozmq)
 <*.native>: package(ozmq), package(unix), package(str), package(num)
 <*.byte>: package(ozmq), package(unix), package(str), package(num)

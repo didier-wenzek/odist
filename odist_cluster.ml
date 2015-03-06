@@ -3,7 +3,6 @@ module Infix = Odist_infix
 module Fold = Odist_fold
 module Red = Odist_red
 module Col = Odist_col
-open Action
 open Fold
 open Infix
 open Col
