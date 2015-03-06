@@ -1,3 +1,4 @@
+module Infix = Odist_infix
 open Fold
 open Infix
 

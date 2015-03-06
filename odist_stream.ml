@@ -1,3 +1,5 @@
+module Util = Odist_util
+module Infix = Odist_infix
 open Util
 open Infix
 

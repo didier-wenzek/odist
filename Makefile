@@ -1,6 +1,6 @@
 NAME = odist
 DOC = odist.docdir/index.html
-MODULES = infix fold red col text action cluster util odist_stream
+MODULES = odist_infix fold red col text action cluster odist_util odist_stream
 CMI = $(addsuffix .cmi, $(MODULES))
 TARGETS = odist.cma odist.cmxa odist.cmi odist.a $(CMI)
 LIB = $(addprefix _build/, $(TARGETS)) 
@@ -10,7 +10,7 @@ all:
 	ocamlbuild -use-ocamlfind $(TARGETS)
 
 doc:
-	ocamlbuild $(DOC)
+	ocamlbuild -use-ocamlfind $(DOC)
 
 tests:
 	ocamlbuild -use-ocamlfind -lflags -cclib,-lzmq tests.native --

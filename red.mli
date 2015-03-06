@@ -1,7 +1,6 @@
 (** Reducers *)
 
 open Fold
-open Util
 
 val and_reducer: (bool, bool, bool, bool) red
 val or_reducer: (bool, bool, bool, bool) red

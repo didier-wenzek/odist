@@ -1,13 +1,14 @@
+module Infix = Odist_infix
+module Stream = Odist_stream
 open Fold
-open Util
 open Infix
 
 type ('a,'m,'s) action = {
   monoid: ('m,'a) Fold.colmonoid;
-  system: ('a,'s,unit) Odist_stream.sink;
+  system: ('a,'s,unit) Stream.sink;
 }
 
-let sstream action = Odist_stream.stream action.system
+let sstream action = Stream.stream action.system
 
 let stream action = function
   | Stream xs -> sstream action xs

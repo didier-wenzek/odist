@@ -6,5 +6,5 @@ include Col
 include Text
 include Action
 include Cluster
-module Infix = Infix
+module Infix = Odist_infix
 module Stream = Odist_stream
