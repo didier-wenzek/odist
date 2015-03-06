@@ -15,7 +15,7 @@ let min_reducer compare =
   in opt_monoid min
 
 let first =
-  let append a b = match a with
+  let add a b = match a with
     | None -> Some b
     | _ -> a
   in
@@ -24,99 +24,113 @@ let first =
     | _ -> a
   in
   {
-    empty = (fun () -> None);
-    append = append;
-    merge = merge;
+    monoid = {
+      empty = (fun () -> None);
+      add = add;
+      merge = merge;
+      maximum = Some (function None -> false | _ -> true);
+      items = (fun o -> Odist_stream.of_option o);
+    };
+    inject = add;
     result = id;
-    maximum = Some (fun x -> match x with None -> false | _ -> true);
   }
 
 let last =
-  let append a b = Some b
-  in
+  let add a b = Some b in
   let merge a b = match b with
     | None -> a
     | _ -> b
   in
   {
-    empty = (fun () -> None);
-    append = append;
-    merge = merge;
+    monoid = {
+      empty = (fun () -> None);
+      add = add;
+      merge = merge;
+      maximum = None;
+      items = Odist_stream.of_option;
+    };
+    inject = add;
     result = id;
-    maximum = None;
   }
 
+(* FIXME: how to avoid taking more than n items. *)
 let taking n reducer =
-  {
-     empty = (fun () -> (0,reducer.empty ()));
-     result = (fun (_,r) -> reducer.result r);
-     append = (fun (c,xs) x -> (c+1, reducer.append xs x));
-     merge = (fun (c,xs) (d,ys) -> (c+d, reducer.merge xs ys)); (* FIXME: how to avoid taking more than n items. *)
-     maximum = Some (fun (c,_) -> c >= n);
-  }
+  let counter = monoid 0 (+) |> mapping (fun x -> 1) in
+  pair_reducer counter reducer |> returning snd |> with_maximum_check (fun (c,_) -> c >= n)
 
 let partition p true_red false_red =
+  let inject (ts,fs) x = if p x then (true_red.inject ts x, fs) else (ts, false_red.inject fs x) in
+  let pair_result (ts,fs) = (true_red.result ts, false_red.result fs) in
   {
-    empty = (fun () -> (true_red.empty (), false_red.empty ()));
-    append = (fun (ts,fs) x -> if p x then (true_red.append ts x, fs) else (ts, false_red.append fs x));
-    merge = (fun (ts1,fs1) (ts2,fs2) -> (true_red.merge ts1 ts2, false_red.merge fs1 fs2));
-    result = (fun (ts,fs) -> (true_red.result ts, false_red.result fs));
-    maximum = match (true_red.maximum, false_red.maximum) with
-      | Some(tmax), Some(fmax) -> Some (fun (ts,fs) -> tmax ts && fmax fs)
-      | _ -> None;
+    monoid = pair_monoid true_red.monoid false_red.monoid;
+    inject = inject;
+    result = pair_result;
   }
 
-let to_string_buffer size = {
-  empty = (fun () -> Buffer.create size);
-  append = (fun buf str -> Buffer.add_string buf str; buf);
-  merge = (fun buf str -> Buffer.add_buffer buf str; buf);
-  result = id;
-  maximum = None
-}
+let to_string_buffer size =
+  reducer_of_monoid {
+    empty = (fun () -> Buffer.create size);
+    add = (fun buf str -> Buffer.add_string buf str; buf);
+    merge = (fun buf str -> Buffer.add_buffer buf str; buf);
+    maximum = None;
+    items = Buffer.contents >> Odist_stream.of_single;
+  }
 
 let to_string = to_string_buffer 16 |> returning Buffer.contents
 
 let to_list =
+  let add xs x = x::xs in
   {
-    empty = (fun () -> []);
-    append = (fun xs x -> x::xs);
-    merge = (fun xs ys -> ys @ xs);
+    monoid = {
+      empty = (fun () -> []);
+      add = add;
+      merge = (fun xs ys -> ys @ xs);
+      maximum = None;
+      items = (fun xs -> List.rev xs |> Odist_stream.of_list);
+    };
+    inject = add;
     result = (fun xs -> List.rev xs);
-    maximum = None;
   }
 
 let to_bag =
+  let add xs x = x::xs in
   {
-    empty = (fun () -> []);
-    append = (fun xs x -> x::xs);
-    merge = List.rev_append;
+    monoid = {
+      empty = (fun () -> []);
+      add = add;
+      merge = (fun xs ys -> List.rev_append xs ys);
+      maximum = None;
+      items = Odist_stream.of_list;
+    };
+    inject = add;
     result = id;
-    maximum = None;
   }
 
 module type SET = sig
   include Set.S
 
-  val union_reducer : (elt, t, t) red
+  val union_reducer : (elt, t, elt, t) red
   val items: t -> elt col
 end
 
 module SetRed(S: Set.S) = struct
   include S
 
-  let union_reducer =
-  {
-    empty = const S.empty;
-    append = (fun xs x -> S.add x xs);
-    merge = S.union;
-    result = id;
-    maximum = None;
-  }
-
-  let items xs = Stream (
+  let to_sfoldable xs =
     Odist_stream.Stream {
       Odist_stream.sfold = (fun red acc -> S.fold (fun x xs -> red xs x) xs acc);
-    })
+    }
+
+  let union_reducer =
+    reducer_of_monoid {
+      empty = const S.empty;
+      add = (fun xs x -> S.add x xs);
+      merge = S.union;
+      maximum = None;
+      items = to_sfoldable;
+    }
+
+  let items xs = Stream (to_sfoldable xs)
 end
 
 module MakeSetRed(E: Set.OrderedType) = SetRed(Set.Make(E))
@@ -124,58 +138,89 @@ module MakeSetRed(E: Set.OrderedType) = SetRed(Set.Make(E))
 module type MAP = sig
   include Map.S
 
-  val grouping_with: ('a,'b,'b) red -> (key * 'a, 'b t, 'b t) red
-  val grouping_by: ('a -> key) -> ('a,'b,'b) red -> ('a, 'b t, 'b t) red
-  val grouping: (key,'b,'b) red -> (key, 'b t, 'b t) red
+  val grouping_with: ('a,'b,'b,'b) red -> (key * 'a, 'b t, key * 'b, 'b t) red
+  val grouping_by: ('a -> key) -> ('a,'b,'b,'b) red -> ('a, 'b t, key * 'b, 'b t) red
+  val grouping: (key,'b,'b,'b) red -> (key, 'b t, key * 'b, 'b t) red
   val pairs: 'a t -> (key * 'a) col
 end
 
 module MapRed(M: Map.S) = struct
   include M
 
+  let to_sfoldable kvs =
+    Odist_stream.Stream {
+      Odist_stream.sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) kvs acc);
+    }
+
   let grouping_with value_reducer =
-    let get m k = try M.find k m with Not_found -> value_reducer.empty () in
+    let m_reducer = value_reducer.monoid in
+    let get m k = try M.find k m with Not_found -> m_reducer.empty () in
+    let value_inserter inject m (k,v) = let v' = get m k in let v'' = inject v' v in M.add k v'' m in
     let value_merger k oa ob = match (oa,ob) with
       | (None, _) -> ob
       | (_, None) -> oa
-      | (Some a, Some b) -> Some (value_reducer.merge a b)
+      | (Some a, Some b) -> Some (m_reducer.merge a b)
     in
     {
-      empty = (fun () -> M.empty);
-      append = (fun m (k,v) -> let v' = get m k in let v'' = value_reducer.append v' v in M.add k v'' m);
-      merge = M.merge value_merger;
+      monoid = {
+        empty = (fun () -> M.empty);
+        add = value_inserter m_reducer.add;
+        merge = M.merge value_merger;
+        maximum = None;
+        items = to_sfoldable;
+      };
+      inject = value_inserter value_reducer.inject;
       result = id;
-      maximum = None;
     }
 
   let grouping_by k reducer = mapping (fun x -> (k x,x)) (grouping_with reducer) 
   let grouping reducer = mapping (fun x -> (x,x)) (grouping_with reducer)
 
-  let pairs m = Stream (
-    Odist_stream.Stream {
-      Odist_stream.sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) m acc);
-    })
+  let pairs kvs = Stream (to_sfoldable kvs);
 end
 
 module MakeMapRed(E: Map.OrderedType) = MapRed(Map.Make(E))
 
-let array_reducer n red = {
-  empty = (fun () -> Array.init n (fun _ -> red.empty ()));
-  append = (fun a (i,x) ->
+let stream_of_array_i items a =
+  let fold red =
+    let n = Array.length a in
+    let get = Array.get a >> items in
+    let red_i i s x = red s (i,x) in
+    let rec loop i s =
+      if i = n then s
+      else
+        let s' = Odist_stream.fold (red_i i) s (get i) in
+        loop (i+1) s'
+    in loop 0 
+  in
+  Odist_stream.Stream { Odist_stream.sfold = fold }
+
+let array_reducer n red =
+  let monoid = red.monoid in
+  let empty () = Array.init n (fun _ -> monoid.empty ()) in
+  let dispatch add a (i,x) =
     let i' = i mod n in
-    let x' = red.append (Array.get a i') x in
+    let x' = add (Array.get a i') x in
     Array.set a i' x'; a
-  );
-  merge = (fun a b ->
+  in
+  let merge a b =
     let update i x =
-      let x' = red.merge x (Array.get b i)
+      let x' = monoid.merge x (Array.get b i)
       in Array.set a i x'
     in
     Array.iteri update a; a
-  );
-  result = Array.map red.result;
-  maximum = None;
-}
+  in
+  {
+    monoid = {
+      empty = empty;
+      add = dispatch monoid.add;
+      merge = merge;
+      maximum = None; (* TODO *)
+      items = stream_of_array_i monoid.items
+    };
+    inject = dispatch red.inject;
+    result = Array.map red.result;
+  }
 
 module type NUM = sig
   type t
@@ -189,28 +234,18 @@ end
 module type NUMRED = sig
   include NUM
 
-  val sum: (t, t, t) red
-  val product: (t, t, t) red
-  val count: ('a, t, t) red
-  val square_sum: (t, t, t) red
+  val sum: (t, t, t, t) red
+  val product: (t, t, t, t) red
+  val count: ('a, t, t, t) red
+  val square_sum: (t, t, t, t) red
 end
 
 module NumRed(N: NUM) = struct
-
   include N
 
   let sum = monoid N.zero N.add
-
   let product = monoid N.one N.mul |> with_maximum N.zero
-
-  let count = {
-    empty = (fun () -> N.zero);
-    append = (fun c x -> N.add c N.one);
-    merge = N.add;
-    result = id;
-    maximum = None;
-  }
-
+  let count = { sum with inject = (fun c _ -> N.add c N.one) }
   let square_sum = mapping (fun x -> N.mul x x) sum
 end
 

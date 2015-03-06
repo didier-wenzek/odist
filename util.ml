@@ -1,3 +1,5 @@
+type ('a,'b) either = Left of 'a | Right of 'b
+
 (** [protect ~finally f x] calls [f x] and ensures that [finally ()] is called before returning [f x].
 
     Adapted from http://stackoverflow.com/questions/11276985/emulating-try-with-finally-in-ocaml.

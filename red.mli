@@ -1,30 +1,31 @@
 (** Reducers *)
 
 open Fold
+open Util
 
-val and_reducer: (bool, bool, bool) red
-val or_reducer: (bool, bool, bool) red
+val and_reducer: (bool, bool, bool, bool) red
+val or_reducer: (bool, bool, bool, bool) red
 val forall: ('a -> bool) -> 'a col -> bool
 val exists: ('a -> bool) -> 'a col -> bool
 
-val max_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a option) red
-val min_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a option) red
+val max_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a, 'a option) red
+val min_reducer: ('a -> 'a -> int) -> ('a, 'a option, 'a, 'a option) red
 
-val first: ('a, 'a option, 'a option) red
-val last: ('a, 'a option, 'a option) red
-val taking: int -> ('a,'b,'c) red -> ('a,int*'b,'c) red
-val partition: ('a -> bool) -> ('a,'b,'c) red -> ('a,'d,'e) red -> ('a,'b*'d,'c*'e) red
+val first: ('a, 'a option, 'a, 'a option) red
+val last: ('a, 'a option, 'a, 'a option) red
+val taking: int -> ('a,'m,'b,'c) red -> ('a,int*'m,int*'m,'c) red
+val partition: ('a -> bool) -> ('a,'m,'b,'c) red -> ('a,'n,'d,'e) red -> ('a,'m*'n, 'm * 'n, 'c*'e) red
 
-val to_string_buffer: int -> (string,Buffer.t,Buffer.t) red
-val to_string: (string,Buffer.t,string) red
+val to_string_buffer: int -> (string,Buffer.t,string,Buffer.t) red
+val to_string: (string,Buffer.t,string,string) red
 
-val to_list: ('a, 'a list, 'a list) red
-val to_bag: ('a, 'a list, 'a list) red
+val to_list: ('a, 'a list, 'a, 'a list) red
+val to_bag: ('a, 'a list, 'a, 'a list) red
 
 module type SET = sig
   include Set.S
 
-  val union_reducer : (elt, t, t) red
+  val union_reducer : (elt, t, elt, t) red
   val items: t -> elt col
 end
 
@@ -36,13 +37,13 @@ module type MAP = sig
   include Map.S
 
   (** Use a value reducer, to build a reducer of (key,value) pairs into a map where all values associated to a shared key are reduced. *)
-  val grouping_with: ('a,'b,'b) red -> (key * 'a, 'b t, 'b t) red
+  val grouping_with: ('a,'b,'b,'b) red -> (key * 'a, 'b t, key * 'b, 'b t) red
 
   (** Use a key extractor and value reducer, to build a reducer of values into a map grouping and reducing values with a shared key. *)
-  val grouping_by: ('a -> key) -> ('a,'b,'b) red -> ('a, 'b t, 'b t) red
+  val grouping_by: ('a -> key) -> ('a,'b,'b,'b) red -> ('a, 'b t, key * 'b, 'b t) red
 
   (** Use a key reducer, to build a reducer of keys into a map where all occurences of a keys are grouped and reduced. *)
-  val grouping: (key,'b,'b) red -> (key, 'b t, 'b t) red
+  val grouping: (key,'b,'b,'b) red -> (key, 'b t, key * 'b, 'b t) red
 
   (** The collection of all (key,value) pairs. *)
   val pairs: 'a t -> (key * 'a) col
@@ -51,7 +52,7 @@ end
 module MapRed(M: Map.S) : MAP 
 module MakeMapRed(E: Map.OrderedType) : MAP with type key = E.t
 
-val array_reducer: int -> ('a,'s,'r) red -> (int*'a,'s array,'r array) red
+val array_reducer: int -> ('a,'m,'b,'c) red -> (int*'a,'m array, int*'b, 'c array) red
 
 module type NUM = sig
   type t
@@ -65,10 +66,10 @@ end
 module type NUMRED = sig
   include NUM
 
-  val sum: (t, t, t) red
-  val product: (t, t, t) red
-  val count: ('a, t, t) red
-  val square_sum: (t, t, t) red
+  val sum: (t, t, t, t) red
+  val product: (t, t, t, t) red
+  val count: ('a, t, t, t) red
+  val square_sum: (t, t, t, t) red
 end
 
 module NumRed(N: NUM) : NUMRED with type t = N.t

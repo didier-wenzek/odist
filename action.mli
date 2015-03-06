@@ -28,7 +28,7 @@
       }
 *)
 type ('a,'m,'s) action = {
-  reducer: ('a,'m,'m) Fold.red;
+  reducer: ('a,'m,'a,'m) Fold.red;
   init: unit -> 's;
   push_item: 's -> 'a -> 's;
   push: 's -> 'm -> 's;

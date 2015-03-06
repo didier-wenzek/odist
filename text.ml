@@ -19,19 +19,21 @@ let make_prepender merge single =
   fun x xs -> merge (single x) xs
 
 let pack_split_reducer split reducer =
+  let m = reducer.monoid in
+  let add = reducer.inject in
   let empty = S("") in
   let single str =
     match split str with
     | [] -> empty
     | left::tail -> (
-      let middle,oright = fold_all_but_last reducer.append (reducer.empty ()) tail in
+      let middle,oright = fold_all_but_last add (m.empty ()) tail in
       match oright with
       | None -> S(left)
       | Some(right) -> B(left,middle,right)
     )
   in
-  let merge2 = reducer.merge in
-  let merge3 ma s mb = merge2 (reducer.append ma s) mb in
+  let merge2 = m.merge in
+  let merge3 ma s mb = merge2 (add ma s) mb in
   let merge4 ma sa sb mb = match single (sa ^ sb) with
     | S(s) -> merge3 ma s mb
     | B(sl,sm,sr) -> merge3 ma sl (merge3 sm sr mb)
@@ -44,8 +46,8 @@ let pack_split_reducer split reducer =
     | S(s) -> B(la, ma,s)
     | B(sl,sm,sr) -> B(la, merge3 ma sl sm, sr)
   in
-  let reducer_single item = reducer.append (reducer.empty ()) item in
-  let reducer_prepend item items = reducer.merge (reducer_single item) items in
+  let reducer_single item = add (m.empty ()) item in
+  let reducer_prepend item items = m.merge (reducer_single item) items in
   let merge a b = match (a,b) with
     | S(sa),S(sb) -> single (sa ^ sb)
     | S(sa),B(lb,mb,rb) -> prepend3 sa lb mb rb
@@ -55,15 +57,19 @@ let pack_split_reducer split reducer =
   let append xs x = merge xs (single x) in
   let pack a = match a with
     | S(s) -> reducer_single s
-    | B(l,m,r) -> reducer_prepend l (reducer.append m r) 
+    | B(l,mv,r) -> reducer_prepend l (add mv r) 
   in
   let result a = reducer.result (pack a) in
   let maximum = None
   in
   {
-    empty = (fun () -> empty);
-    append = append;
-    merge = merge;
+    monoid = {
+      empty = (fun () -> empty);
+      add = merge;
+      merge = merge;
+      maximum = maximum;
+      items = Odist_stream.of_single;
+    };
+    inject = append;
     result = result;
-    maximum = maximum;
   }

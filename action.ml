@@ -3,7 +3,7 @@ open Util
 open Infix
 
 type ('a,'m,'s) action = {
-  reducer: ('a,'m,'m) Fold.red;
+  reducer: ('a,'m,'a,'m) Fold.red;
   init: unit -> 's;
   push_item: 's -> 'a -> 's;
   push: 's -> 'm -> 's;
@@ -43,7 +43,7 @@ let pstream sys =
 
 let stream sys = function
   | Stream xs -> sstream sys xs
-  | Parcol xss -> xss.pfold (collect_stream sys.reducer) |> pstream sys
+  | Parcol xss -> xss.pfold (collect_stream sys.reducer) |> sstream sys (* FIXME pstream and sys.push are unused. *)
 
 let to_printer = {
   reducer = Red.to_string_buffer 64;

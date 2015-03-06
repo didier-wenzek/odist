@@ -34,8 +34,11 @@ val display_current: (string,unit,unit) sink
 
 val map: ('a->'b) -> 'a src -> 'b src
 val filter: ('a->bool) -> 'a src -> 'a src
+val flatmap: ('a->'b src) -> 'a src -> 'b src
+val unnest: ('a->'b src) -> 'a src -> ('a*'b) src
 
 val of_single: 'a -> 'a src
+val of_option: 'a option -> 'a src
 
 val to_list: ('a,'a list,'a,'a list) red
 val of_list: 'a list -> 'a src

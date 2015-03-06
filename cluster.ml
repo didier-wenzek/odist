@@ -129,14 +129,7 @@ end = struct
       let channel = ipc_channel channel_name (string_of_int point) in 
       Zmq.connect outfan channel; outfan
     in
-    let to_outfan_connector = {
-      empty = (fun () -> Zmq.socket cluster.context Zmq.PUSH);
-      append = connect_outfan;
-      merge = (fun a b -> a); (* FIXME *)
-      result = id;
-      maximum = None;
-    } in
-    let connect () = Col.of_range 0 (cluster.size -1) |> reduce to_outfan_connector in
+    let connect () = Col.of_range 0 (cluster.size -1) |> fold connect_outfan (Zmq.socket cluster.context Zmq.PUSH) in
     let close outfans () = close cluster.this_node outfans in
     let push outfan msg = send cluster.this_node msg outfan;outfan in
     {

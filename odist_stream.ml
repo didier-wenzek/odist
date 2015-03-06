@@ -151,7 +151,12 @@ let integers =
     sfold = fold;
   }
 
+let of_empty = Stream { sfold = (fun push seed -> seed) }
 let of_single x = Stream { sfold = (fun push seed -> push seed x) }
+let of_option = function
+  | None -> of_empty
+  | Some x -> of_single x
+
 let collect_single sink = fun xs -> xs |> stream sink |> of_single
 
 let monoid zero plus =
@@ -190,6 +195,26 @@ let filtering p sink = {
 let filter q xs =
   Transf {
     tfold = (fun sink -> xs |> stream (filtering q sink))
+  }
+
+let flatmapping f sink = {
+    sink with
+    push = (fun acc x -> fold sink.push acc (f x))
+  }
+
+let flatmap f xs =
+  Transf {
+    tfold = (fun sink -> xs |> stream (flatmapping f sink))
+  }
+
+let unnesting f sink = {
+    sink with
+    push = (fun acc x -> fold (fun acc y -> sink.push acc (x,y)) acc (f x))
+  }
+
+let unnest f xs =
+  Transf {
+    tfold = (fun sink -> xs |> stream (unnesting f sink))
   }
 
 module type SET = sig
