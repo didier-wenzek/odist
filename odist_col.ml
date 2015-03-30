@@ -1,27 +1,28 @@
 module Fold = Odist_fold
+module Stream = Odist_stream
 open Unix
 open Fold
 
-let empty = Stream (Odist_stream.Stream {
-  Odist_stream.sfold = (fun _ seed -> seed)
+let empty = Seqcol (Stream.Stream {
+  Stream.sfold = (fun _ seed -> seed)
 })
 
-let single x = Stream (Odist_stream.of_single x)
+let single x = Seqcol (Stream.of_single x)
 
-let cons x xs = Stream (Odist_stream.Stream {
-  Odist_stream.sfold = (fun red seed -> fold red (red seed x) xs )
+let cons x xs = Seqcol (Stream.Stream {
+  Stream.sfold = (fun red seed -> fold red (red seed x) xs )
 })
 
-let append xs x = Stream (Odist_stream.Stream {
-  Odist_stream.sfold = (fun red e -> red (fold red e xs) x)
+let append xs x = Seqcol (Stream.Stream {
+  Stream.sfold = (fun red e -> red (fold red e xs) x)
 })
 
-let concat xs ys = Stream (Odist_stream.Stream {
-  Odist_stream.sfold = (fun red e -> fold red (fold red e xs) ys)
+let concat xs ys = Seqcol (Stream.Stream {
+  Stream.sfold = (fun red e -> fold red (fold red e xs) ys)
 })
 
-let of_list xs = Stream (Odist_stream.Stream {
-  Odist_stream.sfold = (fun red acc -> List.fold_left red acc xs)
+let of_list xs = Seqcol (Stream.Stream {
+  Stream.sfold = (fun red acc -> List.fold_left red acc xs)
 })
 
 let of_range min max =
@@ -29,11 +30,11 @@ let of_range min max =
     let rec loop a i = if i>max then a else loop (red a i) (i+1)
     in loop acc min
   in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })
 
 let of_array xs =
   let fold red acc = Array.fold_left red acc xs in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })
 
 let of_array_i a =
   let fold red =
@@ -44,7 +45,7 @@ let of_array_i a =
       else loop (i+1) (red s (i,get i))
     in loop 0 
   in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })
 
 let iterdir f path =
   let dir = opendir path in
@@ -91,10 +92,10 @@ let of_files ?(recursive = true) path =
   if recursive
   then
     let fold red seed = recfoldfiles red seed path in
-    Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+    Seqcol (Stream.Stream { Stream.sfold = fold })
   else
     let fold red seed = foldfiles red seed path in
-    Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+    Seqcol (Stream.Stream { Stream.sfold = fold })
 
 (* [recfoldsubdirs comb seed directory] iterates recursively over all sub-dirs of the given [directory]. *)
 let recfoldsubdirs comb seed path =
@@ -122,10 +123,10 @@ let of_subdirs ?(recursive = true) path =
   if recursive
   then
     let fold red seed = recfoldsubdirs red seed path in
-    Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+    Seqcol (Stream.Stream { Stream.sfold = fold })
   else
     let fold red seed = foldsubdirs red seed path in
-    Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+    Seqcol (Stream.Stream { Stream.sfold = fold })
 
 (* [fold_file_chunks size path comb seed] reads chunks of the given size and combines them. *)
 let fold_file_chunks size path comb seed =
@@ -141,7 +142,7 @@ let fold_file_chunks size path comb seed =
 
 let of_file_chunks size path =
   let fold red seed = fold_file_chunks size path red seed in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })
 
 (** folds chars of substring. *)
 let string_chars str start len comb seed =
@@ -167,7 +168,7 @@ let file_characters path comb seed =
 
 let of_file_chars path =
   let fold red seed = file_characters path red seed in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })
 
 (* string processing *)
 let token_combiner is_sep seed comb term =
@@ -198,9 +199,9 @@ let tokens is_sep file comb seed =
 let of_file_words path =
   let sep c = not (isalpha c) in
   let fold red = tokens sep path red in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })
 
 let of_file_lines path =
   let sep c = c = '\n' in
   let fold red seed = tokens sep path red seed in
-  Stream (Odist_stream.Stream { Odist_stream.sfold = fold })
+  Seqcol (Stream.Stream { Stream.sfold = fold })

@@ -16,9 +16,9 @@ let fold_nested_list red =
     | N xxs -> List.fold_left fold acc xxs
     in fold
 
-let nested_list xs = Stream (
-  Odist_stream.Stream {
-    Odist_stream.sfold = (fun red acc -> fold_nested_list red acc xs);
+let nested_list xs = Seqcol (
+  Stream.Stream {
+    Stream.sfold = (fun red acc -> fold_nested_list red acc xs);
   })
 
 module S = MakeSetRed(struct

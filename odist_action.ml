@@ -1,18 +1,15 @@
-module Stream = Odist_stream
-module Fold = Odist_fold
-module Red = Odist_red
-open Fold
+open Odist_fold
 open Odist_util
 
 type ('a,'m,'s) action = {
-  monoid: ('m,'a) Fold.colmonoid;
+  monoid: ('m,'a) Odist_fold.colmonoid;
   resource: ('a,'s,unit) Odist_stream.sink Odist_stream.resource;
 }
 
-let sstream action = Stream.stream_to action.resource
+let sstream action = Odist_stream.stream_to action.resource
 
 let stream action = function
-  | Stream xs -> sstream action xs
+  | Seqcol xs -> sstream action xs
   | Parcol xss -> xss.pfold (collect_stream action.monoid action.monoid.add) |> sstream action
 
 let to_printer =
@@ -25,7 +22,7 @@ let to_printer =
   } in
   let close = nop in
   {
-    monoid = (Red.to_string_buffer 64).monoid;
+    monoid = (Odist_red.to_string_buffer 64).monoid;
     resource = (fun () -> (sink,close));
   }
 
@@ -42,6 +39,6 @@ let to_file_printer file =
     in (sink,close)
   in
   {
-    monoid = (Red.to_string_buffer 64).monoid;
+    monoid = (Odist_red.to_string_buffer 64).monoid;
     resource = open_channel;
   }

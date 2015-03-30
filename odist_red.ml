@@ -1,7 +1,6 @@
-module Infix = Odist_infix
-module Fold = Odist_fold
-open Fold
-open Infix
+open Odist_fold
+open Odist_infix
+module Stream = Odist_stream
 
 let and_reducer = monoid true (&&) |> with_maximum_check not
 let or_reducer = monoid false (||) |> with_maximum_check id
@@ -31,7 +30,7 @@ let first =
       add = add;
       merge = merge;
       maximum = Some (function None -> false | _ -> true);
-      items = (fun o -> Odist_stream.of_option o);
+      items = (fun o -> Stream.of_option o);
     };
     inject = add;
     result = id;
@@ -49,7 +48,7 @@ let last =
       add = add;
       merge = merge;
       maximum = None;
-      items = Odist_stream.of_option;
+      items = Stream.of_option;
     };
     inject = add;
     result = id;
@@ -75,7 +74,7 @@ let to_string_buffer size =
     add = (fun buf str -> Buffer.add_string buf str; buf);
     merge = (fun buf str -> Buffer.add_buffer buf str; buf);
     maximum = None;
-    items = Buffer.contents >> Odist_stream.of_single;
+    items = Buffer.contents >> Stream.of_single;
   }
 
 let to_string = to_string_buffer 16 |> returning Buffer.contents
@@ -88,7 +87,7 @@ let to_list =
       add = add;
       merge = (fun xs ys -> ys @ xs);
       maximum = None;
-      items = (fun xs -> List.rev xs |> Odist_stream.of_list);
+      items = (fun xs -> List.rev xs |> Stream.of_list);
     };
     inject = add;
     result = (fun xs -> List.rev xs);
@@ -102,7 +101,7 @@ let to_bag =
       add = add;
       merge = (fun xs ys -> List.rev_append xs ys);
       maximum = None;
-      items = Odist_stream.of_list;
+      items = Stream.of_list;
     };
     inject = add;
     result = id;
@@ -119,8 +118,8 @@ module SetRed(S: Set.S) = struct
   include S
 
   let to_sfoldable xs =
-    Odist_stream.Stream {
-      Odist_stream.sfold = (fun red acc -> S.fold (fun x xs -> red xs x) xs acc);
+    Stream.Stream {
+      Stream.sfold = (fun red acc -> S.fold (fun x xs -> red xs x) xs acc);
     }
 
   let union_reducer =
@@ -132,7 +131,7 @@ module SetRed(S: Set.S) = struct
       items = to_sfoldable;
     }
 
-  let items xs = Stream (to_sfoldable xs)
+  let items xs = Seqcol (to_sfoldable xs)
 end
 
 module MakeSetRed(E: Set.OrderedType) = SetRed(Set.Make(E))
@@ -150,8 +149,8 @@ module MapRed(M: Map.S) = struct
   include M
 
   let to_sfoldable kvs =
-    Odist_stream.Stream {
-      Odist_stream.sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) kvs acc);
+    Stream.Stream {
+      Stream.sfold = (fun red acc -> M.fold (fun k v acc -> red acc (k,v)) kvs acc);
     }
 
   let grouping_with value_reducer =
@@ -178,7 +177,7 @@ module MapRed(M: Map.S) = struct
   let grouping_by k reducer = mapping (fun x -> (k x,x)) (grouping_with reducer) 
   let grouping reducer = mapping (fun x -> (x,x)) (grouping_with reducer)
 
-  let pairs kvs = Stream (to_sfoldable kvs);
+  let pairs kvs = Seqcol (to_sfoldable kvs);
 end
 
 module MakeMapRed(E: Map.OrderedType) = MapRed(Map.Make(E))
@@ -191,11 +190,11 @@ let stream_of_array_i items a =
     let rec loop i s =
       if i = n then s
       else
-        let s' = Odist_stream.fold (red_i i) s (get i) in
+        let s' = Stream.fold (red_i i) s (get i) in
         loop (i+1) s'
     in loop 0 
   in
-  Odist_stream.Stream { Odist_stream.sfold = fold }
+  Stream.Stream { Stream.sfold = fold }
 
 let array_reducer n red =
   let monoid = red.monoid in

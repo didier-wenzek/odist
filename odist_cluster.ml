@@ -1,15 +1,12 @@
-module Util = Odist_util
-module Infix = Odist_infix
 module Fold = Odist_fold
+module Stream = Odist_stream
 module Red = Odist_red
 module Col = Odist_col
-open Fold
-open Infix
-open Col
-open Red
-open Util
+open Odist_fold
+open Odist_util
+open Odist_infix
 
-module NodeSet = MakeSetRed(struct
+module NodeSet = Red.MakeSetRed(struct
   type t = int
   let compare = compare
 end)
@@ -55,22 +52,22 @@ module ZmqPullPushCores : sig
     In practice this sink, has to be adapted to encode values and to allot them to nodes of the cluster.
     [my_collection |> allot_with hash |> stream (scatter cluster channel_name)]
   *)
-  val scatter: t -> string -> (int*string,outfan,unit) Odist_stream.sink Odist_stream.resource
+  val scatter: t -> string -> (int*string,outfan,unit) Stream.sink Stream.resource
   
-  val allot_with: ('a -> int) -> 'a Odist_stream.src -> (int*'a) Odist_stream.src
-  val roundrobin: string Odist_stream.src -> (int*string) Odist_stream.src
+  val allot_with: ('a -> int) -> 'a Stream.src -> (int*'a) Stream.src
+  val roundrobin: string Stream.src -> (int*string) Stream.src
   
   (**
     [gather cluster channel_name] gathers (node,message) of type (int,string) received from the cluster on the given channel.
     The gathering process ends when all nodes of the cluster has called the [term ()] method of they scattering sink.
   *)
-  val gather: t -> string -> (int * string) Odist_stream.src
+  val gather: t -> string -> (int * string) Stream.src
   
-  val ignore_order: (int * string) Odist_stream.src -> string Odist_stream.src
+  val ignore_order: (int * string) Stream.src -> string Stream.src
 
   (** [col |> distribute ipcdir node_count] distributes the elements of a collection over the cluster nodes.*)
-  val distribute: string -> int -> 'a Fold.col -> 'a Fold.col
-  val fair_distribute: string -> int -> 'a Fold.col -> 'a Fold.col
+  val distribute: string -> int -> 'a col -> 'a col
+  val fair_distribute: string -> int -> 'a col -> 'a col
 
 end = struct
   type t = {
@@ -117,10 +114,10 @@ end = struct
     let close outfans = fun () -> Array.iter close_outfan outfans in
     let sink outfans =
     {
-      Odist_stream.init = (fun () -> outfans); 
-      Odist_stream.push = push;
-      Odist_stream.term = ignore;
-      Odist_stream.full = None
+      Stream.init = (fun () -> outfans); 
+      Stream.push = push;
+      Stream.term = ignore;
+      Stream.full = None
     } in
     (fun () -> let hdl = connect () in (sink hdl, close hdl))
   
@@ -140,10 +137,10 @@ end = struct
     let push outfan msg = send cluster.this_node msg outfan;outfan in
     let sink outfans =
     {
-      Odist_stream.init = (fun () -> outfans);
-      Odist_stream.push = push;
-      Odist_stream.term = ignore;
-      Odist_stream.full = None
+      Stream.init = (fun () -> outfans);
+      Stream.push = push;
+      Stream.term = ignore;
+      Stream.full = None
     } in
     (fun () -> let hdl = connect () in (sink hdl, close hdl))
   
@@ -171,24 +168,24 @@ end = struct
   
   let gather cluster channel_name =
     let fold red acc = gather_fold cluster channel_name red acc in
-    Odist_stream.Stream {
-      Odist_stream.sfold = fold;
+    Stream.Stream {
+      Stream.sfold = fold;
     }
 
   let allotting_with hash sink =
-    Odist_stream.{
+    Stream.{
       sink with
       push = (fun hdl item -> sink.push hdl (hash item,item));
     }
 
   let allot_with hash msgs =
     let adapt sink = allotting_with hash sink in
-    Odist_stream.Transf {
-       Odist_stream.tfold = (fun sink -> msgs |> Odist_stream.stream (adapt sink))
+    Stream.Transf {
+       Stream.tfold = (fun sink -> msgs |> Stream.stream (adapt sink))
     }
   
   let using_roundrobin sink =
-    Odist_stream.{
+    Stream.{
       init = (fun () -> (0,sink.init ())); 
       push = (fun (lot,hdl) item -> (lot+1, sink.push hdl (lot,item)));
       term = (fun (_,hdl) -> sink.term hdl);
@@ -198,19 +195,19 @@ end = struct
     }
 
   let roundrobin msgs =
-    Odist_stream.Transf {
-       Odist_stream.tfold = (fun sink -> msgs |> Odist_stream.stream (using_roundrobin sink))
+    Stream.Transf {
+       Stream.tfold = (fun sink -> msgs |> Stream.stream (using_roundrobin sink))
     }
 
   let ignoring_order sink =
-    Odist_stream.{
+    Stream.{
       sink with
-      push = (fun hdl (_,msg) -> sink.Odist_stream.push hdl msg)
+      push = (fun hdl (_,msg) -> sink.Stream.push hdl msg)
     }
 
   let ignore_order node_msg_pairs =
-    Odist_stream.Transf {
-       Odist_stream.tfold = (fun sink -> node_msg_pairs |> Odist_stream.stream (ignoring_order sink))
+    Stream.Transf {
+       Stream.tfold = (fun sink -> node_msg_pairs |> Stream.stream (ignoring_order sink))
     }
   
   let distribute ipcdir size col =
@@ -218,19 +215,19 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
-    let stream_to_channel cluster name = Odist_stream.map encode >> roundrobin >> Odist_stream.stream_to (scatter cluster name) in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> Stream.map decode in
+    let stream_to_channel cluster name = Stream.map encode >> roundrobin >> Stream.stream_to (scatter cluster name) in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
          launch_bg 1 size (fun cluster -> col |> to_stream |> stream_to_channel cluster channel_A);
          launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> part_reducer |> stream_to_channel cluster channel_B);
-         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Odist_stream.fold comb_reducer seed)
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Stream.fold comb_reducer seed)
        end
     in
     Parcol {
-       pfold = (fun part_reducer -> Odist_stream.Stream { Odist_stream.sfold = (fun comb_reducer -> par_fold part_reducer comb_reducer) })
+       pfold = (fun part_reducer -> Stream.Stream { Stream.sfold = (fun comb_reducer -> par_fold part_reducer comb_reducer) })
     }
 
   let fair_distribute ipcdir size col =
@@ -238,24 +235,24 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = Odist_stream.map encode >> Odist_stream.stream_to (fair_scatter cluster name) in
-    let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
+    let stream_to_channel cluster name = Stream.map encode >> Stream.stream_to (fair_scatter cluster name) in
+    let gather_from_channel cluster name = gather cluster name |> ignore_order |> Stream.map decode in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
        begin
          launch_bg 1 size (fun cluster -> col |> to_stream |> stream_to_channel cluster channel_A);
          launch_bg size 1 (fun cluster -> gather_from_channel cluster channel_A |> part_reducer |> stream_to_channel cluster channel_B);
-         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Odist_stream.fold comb_reducer seed)
+         launch_fg size   (fun cluster -> gather_from_channel cluster channel_B |> Stream.fold comb_reducer seed)
        end
     in
     Parcol {
-       pfold = (fun part_reducer -> Odist_stream.Stream { Odist_stream.sfold = (fun comb_reducer -> par_fold part_reducer comb_reducer) })
+       pfold = (fun part_reducer -> Stream.Stream { Stream.sfold = (fun comb_reducer -> par_fold part_reducer comb_reducer) })
     }
 end
  
 type cluster = {
-  distribute: 'a. 'a Fold.col -> 'a Fold.col
+  distribute: 'a. 'a col -> 'a col
 }
 
 let mcores ?ipc_dir core_count =

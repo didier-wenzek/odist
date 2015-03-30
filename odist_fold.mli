@@ -59,7 +59,7 @@ type ('a,'m,'b,'c) red = {
     leading to partial results to reducer further in a second step.
 *)
 type 'a pfoldable = { pfold: 'b. ('a sfoldable -> 'b sfoldable) -> 'b sfoldable }
-type 'a col = Stream of 'a sfoldable | Parcol of 'a pfoldable
+type 'a col = Seqcol of 'a sfoldable | Parcol of 'a pfoldable
 
 (** [reduce red col] reduces the collection using the reducer. *)
 val reduce: ('a,'m,'b,'c) red -> 'a col -> 'c

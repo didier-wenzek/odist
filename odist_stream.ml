@@ -1,7 +1,5 @@
-module Util = Odist_util
-module Infix = Odist_infix
-open Util
-open Infix
+open Odist_util
+open Odist_infix
 
 type ('a,'b,'c) sink = {
   init: unit -> 'b;

@@ -1,5 +1,3 @@
-module Fold = Odist_fold
-
 (* An action wraps a statefull and/or effectfull system.
 
    It works around a monoid and a resource on which the monoid values act.
@@ -14,7 +12,7 @@ module Fold = Odist_fold
       resource.push x >> resource.push y     =   resource.push (monoid.merge x y)
 *)
 type ('a,'m,'s) action = {
-  monoid: ('m,'a) Fold.colmonoid;
+  monoid: ('m,'a) Odist_fold.colmonoid;
   resource: ('a,'s,unit) Odist_stream.sink Odist_stream.resource;
 }
 
@@ -22,7 +20,7 @@ type ('a,'m,'s) action = {
 
    [col |> stream action]
 *)
-val stream : ('a,'m,'s) action -> 'a Fold.col -> unit
+val stream : ('a,'m,'s) action -> 'a Odist_fold.col -> unit
 val sstream : ('a,'m,'s) action -> 'a Odist_stream.src -> unit
 
 (* Printing action of a stream of strings on standard output. *)

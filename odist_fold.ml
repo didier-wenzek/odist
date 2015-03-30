@@ -1,11 +1,10 @@
-module Util = Odist_util
-module Infix = Odist_infix
-open Util
-open Infix
+module Stream = Odist_stream
+open Odist_util
+open Odist_infix
 
-type 'a sfoldable = 'a Odist_stream.src
+type 'a sfoldable = 'a Stream.src
 type 'a pfoldable = { pfold: 'b. ('a sfoldable -> 'b sfoldable) -> 'b sfoldable }
-type 'a col = Stream of 'a sfoldable | Parcol of 'a pfoldable
+type 'a col = Seqcol of 'a sfoldable | Parcol of 'a pfoldable
 
 type ('m,'a) colmonoid = {
   empty: unit -> 'm;
@@ -24,74 +23,74 @@ type ('a,'m,'b,'c) red = {
 }
 
 let stream_append red =
-  Odist_stream.stream {
-    Odist_stream.init = red.monoid.empty;
-    Odist_stream.push = red.inject;
-    Odist_stream.term = red.result;
-    Odist_stream.full = red.monoid.maximum;
+  Stream.stream {
+    Stream.init = red.monoid.empty;
+    Stream.push = red.inject;
+    Stream.term = red.result;
+    Stream.full = red.monoid.maximum;
   }
 
 let collect_stream monoid inject =
-  Odist_stream.stream {
-    Odist_stream.init = monoid.empty;
-    Odist_stream.push = inject;
-    Odist_stream.term = monoid.items;
-    Odist_stream.full = monoid.maximum;
+  Stream.stream {
+    Stream.init = monoid.empty;
+    Stream.push = inject;
+    Stream.term = monoid.items;
+    Stream.full = monoid.maximum;
   }
 
 let stream_merge red =
-  Odist_stream.stream {
-    Odist_stream.init = red.monoid.empty;
-    Odist_stream.push = red.monoid.add;
-    Odist_stream.term = red.result;
-    Odist_stream.full = red.monoid.maximum;
+  Stream.stream {
+    Stream.init = red.monoid.empty;
+    Stream.push = red.monoid.add;
+    Stream.term = red.result;
+    Stream.full = red.monoid.maximum;
   }
 
 let reduce red = function
-  | Stream xs -> stream_append red xs
+  | Seqcol xs -> stream_append red xs
   | Parcol xss -> xss.pfold (collect_stream red.monoid red.inject) |> stream_merge red
 
 let pmap f xss = { pfold = (fun g -> xss.pfold (fun xs -> g (f xs))) }
 let map f = function
-  | Stream xs -> Stream (Odist_stream.map f xs)
-  | Parcol xss -> Parcol (pmap (Odist_stream.map f) xss)
+  | Seqcol xs -> Seqcol (Stream.map f xs)
+  | Parcol xss -> Parcol (pmap (Stream.map f) xss)
 
 let filter p = function
-  | Stream xs -> Stream (Odist_stream.filter p xs)
-  | Parcol xss -> Parcol (pmap (Odist_stream.filter p) xss)
+  | Seqcol xs -> Seqcol (Stream.filter p xs)
+  | Parcol xss -> Parcol (pmap (Stream.filter p) xss)
 
 let to_stream = function
-  | Stream xs -> xs
+  | Seqcol xs -> xs
   | Parcol xss -> xss.pfold id
 
-let fold comb seed col = to_stream col |> Odist_stream.fold comb seed 
+let fold comb seed col = to_stream col |> Stream.fold comb seed 
 
 let sflatmap f xs =
-  Odist_stream.Stream {
-    Odist_stream.sfold = (fun comb seed -> Odist_stream.fold (fun acc x -> fold comb acc (f x)) seed xs)
+  Stream.Stream {
+    Stream.sfold = (fun comb seed -> Stream.fold (fun acc x -> fold comb acc (f x)) seed xs)
   }
 let flatmap f = function
-  | Stream xs -> Stream (sflatmap f xs)
+  | Seqcol xs -> Seqcol (sflatmap f xs)
   | Parcol xss -> Parcol (pmap (sflatmap f) xss)
 
 let sunnest f xs =
-  Odist_stream.Stream {
-    Odist_stream.sfold = (fun comb seed -> Odist_stream.fold (fun acc x -> fold (fun a i -> comb a (x,i)) acc (f x)) seed xs)
+  Stream.Stream {
+    Stream.sfold = (fun comb seed -> Stream.fold (fun acc x -> fold (fun a i -> comb a (x,i)) acc (f x)) seed xs)
   }
 
 let unnest f = function
-  | Stream xs -> Stream (sunnest f xs)
+  | Seqcol xs -> Seqcol (sunnest f xs)
   | Parcol xss -> Parcol (pmap (sunnest f) xss)
 
 let col_product l_col r_col pair =
   let append_pair append l_item acc r_item = append acc (pair l_item r_item) in
   let append_pairs append acc x = fold (append_pair append x) acc r_col in
-  let sproduct xs = Odist_stream.Stream {
-      Odist_stream.sfold = (fun append seed -> Odist_stream.fold (append_pairs append) seed xs)
+  let sproduct xs = Stream.Stream {
+      Stream.sfold = (fun append seed -> Stream.fold (append_pairs append) seed xs)
     }
   in
   let product = function
-    | Stream xs -> Stream (sproduct xs)
+    | Seqcol xs -> Seqcol (sproduct xs)
     | Parcol xss -> Parcol (pmap sproduct xss)
   in
   product l_col
@@ -139,7 +138,7 @@ let pair_monoid l_monoid r_monoid =
     add = merge; (* FIXME: use add, which implies that items is of type: ('a,'b) either src *)
     merge = merge ;
     maximum = maximum;
-    items = Odist_stream.of_single; (* FIXME: should emit a sequence of ('a,'b) either. *)
+    items = Stream.of_single; (* FIXME: should emit a sequence of ('a,'b) either. *)
   }
 
 let pair_reducer l_red r_red =
@@ -170,7 +169,7 @@ let monoid zero plus =
     add = plus;
     merge = plus;
     maximum = None;
-    items = Odist_stream.of_single;
+    items = Stream.of_single;
   }
 
 let opt_monoid comb =
@@ -188,7 +187,7 @@ let opt_monoid comb =
     add = add;
     merge = merge;
     maximum = None;
-    items = Odist_stream.of_option;
+    items = Stream.of_option;
   }
 
 let with_maximum maximum red =
