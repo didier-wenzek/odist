@@ -1,5 +1,5 @@
 type ('a,'b,'c) sink = {
-  init: unit -> 'b * (unit->unit);
+  init: unit -> 'b;
   push: 'b -> 'a -> 'b;
   term: 'b -> 'c;
   full: ('b -> bool) option;
@@ -16,7 +16,10 @@ type ('a,'b,'c,'cs) red = {
   collect: 'a src -> 'c src;
 }
 
+type 'a resource = unit -> ('a * (unit->unit))
+
 val stream: ('a,'b,'c) sink -> 'a src -> 'c
+val stream_to: ('a,'b,'c) sink resource -> 'a src -> 'c
 val fold: ('b -> 'a -> 'b) -> 'b -> 'a src -> 'b
 val reduce: ('a,'b,'c,'cs) red -> 'a src -> 'cs
 val collect: ('a,'b,'c,'cs) red -> 'a src -> 'c src

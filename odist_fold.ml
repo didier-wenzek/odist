@@ -25,7 +25,7 @@ type ('a,'m,'b,'c) red = {
 
 let stream_append red =
   Odist_stream.stream {
-    Odist_stream.init = (fun () -> let seed = red.monoid.empty () in (seed,nop));
+    Odist_stream.init = red.monoid.empty;
     Odist_stream.push = red.inject;
     Odist_stream.term = red.result;
     Odist_stream.full = red.monoid.maximum;
@@ -33,7 +33,7 @@ let stream_append red =
 
 let collect_stream monoid inject =
   Odist_stream.stream {
-    Odist_stream.init = (fun () -> let seed = monoid.empty () in (seed,nop));
+    Odist_stream.init = monoid.empty;
     Odist_stream.push = inject;
     Odist_stream.term = monoid.items;
     Odist_stream.full = monoid.maximum;
@@ -41,7 +41,7 @@ let collect_stream monoid inject =
 
 let stream_merge red =
   Odist_stream.stream {
-    Odist_stream.init = (fun () -> let seed = red.monoid.empty () in (seed,nop));
+    Odist_stream.init = red.monoid.empty;
     Odist_stream.push = red.monoid.add;
     Odist_stream.term = red.result;
     Odist_stream.full = red.monoid.maximum;

@@ -4,7 +4,7 @@ open Util
 open Infix
 
 type ('a,'b,'c) sink = {
-  init: unit -> 'b * (unit->unit);
+  init: unit -> 'b;
   push: 'b -> 'a -> 'b;
   term: 'b -> 'c;
   full: ('b -> bool) option;
@@ -21,6 +21,8 @@ type ('a,'b,'c,'cs) red = {
   collect: 'a src -> 'c src;
 }
 
+type 'a resource = unit -> ('a * (unit->unit))
+
 let stream sink = function
   | Transf xs -> xs.tfold sink
   | Stream xs -> 
@@ -31,10 +33,13 @@ let stream sink = function
         xs.sfold push_or_return hdl
       )
     ) in
-    let hdl,finally = sink.init () in
-    protect ~finally fold hdl
+    fold (sink.init ())
 
-let init_value e = (fun () -> e,nop)
+let stream_to sink_resource src =
+  let sink,finally = sink_resource () in
+  protect ~finally (stream sink) src
+
+let init_value e = fun () -> e
 
 let fold comb seed = function
   | Stream xs -> xs.sfold comb seed
@@ -76,7 +81,7 @@ let collect red = red.collect
 
 let take n xs =
   let adapt sink = {
-    init = (fun () -> let hdl,finally = sink.init () in ((0,hdl),finally));
+    init = (fun () -> (0,sink.init ()));
     push = (fun ((i,hdl) as acc) x -> if i < n then (i+1, sink.push hdl x) else acc);
     term = (fun (_,hdl) -> sink.term hdl);
     full = match sink.full with
@@ -89,7 +94,7 @@ let take n xs =
 
 let take_while p xs =
   let adapt sink = {
-    init = (fun () -> let hdl,finally = sink.init () in ((true,hdl),finally));
+    init = (fun () -> (true,sink.init ()));
     push = (fun (ok,hdl) x -> if ok && p x then (true, sink.push hdl x) else (false,hdl));
     term = (fun (_,hdl) -> sink.term hdl);
     full = match sink.full with
@@ -102,7 +107,7 @@ let take_while p xs =
 
 let drop n xs =
   let adapt sink = {
-    init = (fun () -> let hdl,finally = sink.init () in ((0,hdl),finally));
+    init = (fun () -> (0,sink.init ()));
     push = (fun (i,hdl) x -> if i < n then (i+1, hdl) else (i,sink.push hdl x));
     term = (fun (_,hdl) -> sink.term hdl);
     full = match sink.full with
@@ -115,7 +120,7 @@ let drop n xs =
 
 let drop_while p xs =
   let adapt sink = {
-    init = (fun () -> let hdl,finally = sink.init () in ((true,hdl),finally));
+    init = (fun () -> (true,sink.init ()));
     push = (fun (ok,hdl) x -> if ok && p x then (true, hdl) else (false,sink.push hdl x));
     term = (fun (_,hdl) -> sink.term hdl);
     full = match sink.full with
@@ -129,11 +134,7 @@ let drop_while p xs =
 
 let tee sink xs =
   let adapt sink2 = {
-    init = (fun () ->
-      let hdl,finally = sink.init () in
-      let hdl2,finally2 = protect ~finally sink2.init () in
-      ((hdl,hdl2), (fun () -> protect ~finally finally2 ()))
-    );
+    init = (fun () -> (sink.init (), sink2.init ()));
     push = (fun (hdl,hdl2) x -> (sink.push hdl x, sink2.push hdl2 x));
     term = (fun (_,hdl2) -> sink2.term hdl2);
     full = match sink2.full with
@@ -240,7 +241,7 @@ module SetRed(S: Set.S): SET with type t = S.t and type elt = S.elt = struct
   }
 
   let collecting_unique sink = {
-    init = (fun () -> let hdl,finally = sink.init () in ((empty,hdl),finally));
+    init = (fun () -> (empty,sink.init ()));
     push = (fun ((xs,hdl) as acc) x -> if not (mem x xs) then (add x xs, sink.push hdl x) else acc);
     term = (fun (_,hdl) -> sink.term hdl);
     full = match sink.full with
@@ -267,7 +268,7 @@ module SetRed(S: Set.S): SET with type t = S.t and type elt = S.elt = struct
 end
 
 let list_reducer = {
-  init = (fun () -> [],nop);
+  init = (fun () -> []);
   push = (fun xs x -> x::xs);
   term = (fun xs -> List.rev xs);
   full = None;

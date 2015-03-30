@@ -1,37 +1,47 @@
-module Infix = Odist_infix
 module Stream = Odist_stream
 module Fold = Odist_fold
 module Red = Odist_red
 open Fold
-open Infix
+open Odist_util
 
 type ('a,'m,'s) action = {
   monoid: ('m,'a) Fold.colmonoid;
-  system: ('a,'s,unit) Stream.sink;
+  resource: ('a,'s,unit) Odist_stream.sink Odist_stream.resource;
 }
 
-let sstream action = Stream.stream action.system
+let sstream action = Stream.stream_to action.resource
 
 let stream action = function
   | Stream xs -> sstream action xs
   | Parcol xss -> xss.pfold (collect_stream action.monoid action.monoid.add) |> sstream action
 
-let to_printer = {
-  monoid = (Red.to_string_buffer 64).monoid;
-  system = Odist_stream.{
-    init = (fun () -> ((),nop));
+let to_printer =
+  let nop () = () in
+  let sink = Odist_stream.{
+    init = nop;
     push = (fun () c -> print_string c);
     term = ignore;
     full = None;
+  } in
+  let close = nop in
+  {
+    monoid = (Red.to_string_buffer 64).monoid;
+    resource = (fun () -> (sink,close));
   }
-}
 
-let to_file_printer file = {
-  monoid = (Red.to_string_buffer 64).monoid;
-  system = Odist_stream.{
-    init = (fun () -> let out = open_out file in (out,fun () -> close_out out));
-    push = (fun out c -> output_string out c; out);
-    term = ignore;
-    full = None;
+let to_file_printer file =
+  let open_channel () =
+    let out = open_out file in
+    let close () = close_out out in
+    let sink = Odist_stream.{
+      init = (fun () -> ());
+      push = (fun () c -> output_string out c);
+      term = ignore;
+      full = None;
+    }
+    in (sink,close)
+  in
+  {
+    monoid = (Red.to_string_buffer 64).monoid;
+    resource = open_channel;
   }
-}

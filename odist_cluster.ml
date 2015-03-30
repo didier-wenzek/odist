@@ -55,7 +55,7 @@ module ZmqPullPushCores : sig
     In practice this sink, has to be adapted to encode values and to allot them to nodes of the cluster.
     [my_collection |> allot_with hash |> stream (scatter cluster channel_name)]
   *)
-  val scatter: t -> string -> (int*string,outfan,unit) Odist_stream.sink
+  val scatter: t -> string -> (int*string,outfan,unit) Odist_stream.sink Odist_stream.resource
   
   val allot_with: ('a -> int) -> 'a Odist_stream.src -> (int*'a) Odist_stream.src
   val roundrobin: string Odist_stream.src -> (int*string) Odist_stream.src
@@ -115,12 +115,14 @@ end = struct
     let connect () = Array.init cluster.size connect_outfan in
     let push outfans (node,msg) = send cluster.this_node msg outfans.(node mod cluster.size);outfans in
     let close outfans = fun () -> Array.iter close_outfan outfans in
+    let sink outfans =
     {
-      Odist_stream.init = (fun () -> let hdl = connect () in (hdl, close hdl)); 
+      Odist_stream.init = (fun () -> outfans); 
       Odist_stream.push = push;
       Odist_stream.term = ignore;
       Odist_stream.full = None
-    }
+    } in
+    (fun () -> let hdl = connect () in (sink hdl, close hdl))
   
   let connect_outfan cluster channel_name point =
     let channel = ipc_channel channel_name (string_of_int point) in
@@ -136,12 +138,14 @@ end = struct
     let connect () = Col.of_range 0 (cluster.size -1) |> fold connect_outfan (Zmq.socket cluster.context Zmq.PUSH) in
     let close outfans () = close cluster.this_node outfans in
     let push outfan msg = send cluster.this_node msg outfan;outfan in
+    let sink outfans =
     {
-      Odist_stream.init = (fun () -> let hdl = connect () in (hdl, close hdl)); 
+      Odist_stream.init = (fun () -> outfans);
       Odist_stream.push = push;
       Odist_stream.term = ignore;
       Odist_stream.full = None
-    }
+    } in
+    (fun () -> let hdl = connect () in (sink hdl, close hdl))
   
   let gather_fold cluster channel_name append acc =
     let nodes = node_set cluster in
@@ -185,7 +189,7 @@ end = struct
   
   let using_roundrobin sink =
     Odist_stream.{
-      init = (fun () -> let hdl,close = sink.init () in ((0,hdl),close)); 
+      init = (fun () -> (0,sink.init ())); 
       push = (fun (lot,hdl) item -> (lot+1, sink.push hdl (lot,item)));
       term = (fun (_,hdl) -> sink.term hdl);
       full = match sink.full with
@@ -215,7 +219,7 @@ end = struct
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
-    let stream_to_channel cluster name = Odist_stream.map encode >> roundrobin >> Odist_stream.stream (scatter cluster name) in
+    let stream_to_channel cluster name = Odist_stream.map encode >> roundrobin >> Odist_stream.stream_to (scatter cluster name) in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
        let channel_B = make_channel_name ipcdir in
@@ -234,7 +238,7 @@ end = struct
     let launch_bg n m task = fork_n n (task |> using_cluster m) in
     let launch_fg   m task = using_cluster m task 0 in
     let encode,decode = marshall_encoding in 
-    let stream_to_channel cluster name = Odist_stream.map encode >> Odist_stream.stream (fair_scatter cluster name) in
+    let stream_to_channel cluster name = Odist_stream.map encode >> Odist_stream.stream_to (fair_scatter cluster name) in
     let gather_from_channel cluster name = gather cluster name |> ignore_order |> Odist_stream.map decode in
     let par_fold part_reducer comb_reducer seed =
        let channel_A = make_channel_name ipcdir in
