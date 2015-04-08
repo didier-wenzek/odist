@@ -13,7 +13,7 @@ doc:
 	ocamlbuild -use-ocamlfind $(DOC)
 
 tests:
-	ocamlbuild -use-ocamlfind -lflags -cclib,-lzmq tests.native
+	ocamlbuild -use-ocamlfind tests.native
 	_build/tests.native
 
 install: all
