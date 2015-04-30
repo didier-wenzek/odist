@@ -108,7 +108,7 @@ let _ =
   let fact = Col.of_array a |> reduce (monoid 1 ( * )) in
   assert (120 = fact);
   
-  let a = Col.of_range 0 9 |> map (fun i -> i,i) |> reduce (Red.array_reducer 5 to_list) in
+  let a = Col.of_range 0 9 |> map (fun i -> i mod 5,i) |> reduce (Red.array_reducer to_list) in
   assert (a = [| [0;5]; [1;6]; [2;7]; [3;8]; [4;9] |]);
   let ai = Col.of_array_i a |> reduce to_list in
   assert (ai = [ 0,[0;5]; 1,[1;6]; 2,[2;7]; 3,[3;8]; 4,[4;9] ]);

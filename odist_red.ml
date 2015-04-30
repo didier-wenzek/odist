@@ -218,19 +218,27 @@ let stream_of_array_i items a =
   in
   Stream.Stream { Stream.sfold = fold }
 
-let array_reducer n red =
+let array_reducer red =
   let monoid = red.monoid in
-  let empty () = Array.init n (fun _ -> monoid.empty ()) in
+  let empty_item i = monoid.empty () in
+  let empty () = Array.init 0 empty_item in
+  let extend a length =
+    let missing = length - (Array.length a) in
+    if missing > 0
+    then Array.append a (Array.init missing empty_item)
+    else a
+  in
   let dispatch add a (i,x) =
-    let i' = i mod n in
-    let x' = add (Array.get a i') x in
-    Array.set a i' x'; a
+    let a = extend a (i+1) in
+    let x = add (Array.get a i) x in
+    Array.set a i x; a
   in
   let merge a b =
     let update i x =
-      let x' = monoid.merge x (Array.get b i)
-      in Array.set a i x'
+      let x = monoid.merge x (Array.get b i)
+      in Array.set a i x
     in
+    let a = extend a (Array.length b) in
     Array.iteri update a; a
   in
   {
