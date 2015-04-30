@@ -28,5 +28,5 @@ type 'a split
        let file_lines = Col.of_file_chunks 8192 >> reduce to_lines
        file_lines "/tmp/foo"
 *)
-val pack_split_reducer: (string -> string list) -> (string,'m,string,'c) Fold.red -> (string,'m split,'m split,'c) Fold.red
+val pack_split_reducer: (string -> string list) -> (string,'m,'b,'c) Fold.red -> (string,'m split,'m split,'c) Fold.red
 
