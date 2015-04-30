@@ -21,6 +21,8 @@ val to_string: (string,Buffer.t,string,string) red
 val to_list: ('a, 'a list, 'a, 'a list) red
 val to_bag: ('a, 'a list, 'a, 'a list) red
 
+val list_zipper: ('a, 'b, 'b, 'c) red -> ('a list, 'b list, 'b list, 'c list) red
+
 module type SET = sig
   include Set.S
 

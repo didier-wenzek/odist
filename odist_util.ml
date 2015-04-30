@@ -49,3 +49,6 @@ let time f x =
   Printf.printf "elapsed time: %.3f ms\n%!" d;
   r
 
+let option_lift f = function
+  | None -> None
+  | Some x -> Some (f x)

@@ -1,5 +1,6 @@
 open Odist_fold
 open Odist_infix
+open Odist_util
 module Stream = Odist_stream
 
 let and_reducer = monoid true (&&) |> with_maximum_check not
@@ -105,6 +106,27 @@ let to_bag =
     };
     inject = add;
     result = id;
+  }
+
+let list_zipper red =
+  let merge f z xs ys =
+    let rec loop acc xs ys = match xs,ys with
+      | _,     []    -> List.rev_append acc xs
+      | [],    y::ys -> loop ((f (z ()) y)::acc) xs ys
+      | x::xs, y::ys -> loop ((f x y)::acc) xs ys
+    in
+    loop [] xs ys
+  in
+  {
+    monoid = {
+      empty = (fun () -> []);
+      add = merge red.monoid.add red.monoid.empty;
+      merge = merge red.monoid.merge red.monoid.empty;
+      maximum = option_lift List.for_all red.monoid.maximum;
+      items = Stream.of_single;
+    };
+    inject = merge red.inject red.monoid.empty;
+    result = List.map red.result;
   }
 
 module type SET = sig
