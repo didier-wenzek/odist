@@ -45,5 +45,8 @@ val of_file_chars: string -> char Fold.col
 val of_file_lines: string -> string Fold.col
 (* [Col.of_file_lines path] returns all lines of the given file. *)
 
-val of_file_words: string -> string Fold.col
+val of_file_words: ?is_separator:(char->bool) -> string -> string Fold.col
 (* [Col.of_file_words path] returns all words of the given file. *)
+
+val of_string_words: ?is_separator:(char->bool) -> string -> string Fold.col
+(* [Col.of_string_words s] returns all words of the given string. *)

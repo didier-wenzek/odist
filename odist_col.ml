@@ -145,7 +145,7 @@ let of_file_chunks size path =
   Seqcol (Stream.Stream { Stream.sfold = fold })
 
 (** folds chars of substring. *)
-let string_chars str start len comb seed =
+let substring_chars str start len comb seed =
   let get pos = String.get str pos in
   let last = start + len in
   let rec loop pos acc =
@@ -153,6 +153,8 @@ let string_chars str start len comb seed =
     then loop (pos + 1) (comb acc (get pos))
     else acc
   in loop start seed
+
+let string_chars str = substring_chars str 0 (String.length str)
 
 (* [file_characters path comb seed] combines all characters of the file with the given [path]. *)
 let file_characters path comb seed =
@@ -162,7 +164,7 @@ let file_characters path comb seed =
     let l = input channel buffer 0 8192 in
     if l = 0
     then (close_in channel; acc)
-    else loop (string_chars buffer 0 l comb acc)
+    else loop (substring_chars buffer 0 l comb acc)
   in try loop seed
      with  error -> close_in channel; raise error
 
@@ -191,17 +193,19 @@ let isalpha c = 'A'<=c && c<='Z' || 'a'<=c && c<='z' || '0'<=c && c<='9'
 
 let id x = x
 
-let tokens is_sep file comb seed =
+let tokens is_sep chars comb seed =
   let newseed,newcomb,newterm = token_combiner is_sep seed comb id in
-  newterm (file_characters file newcomb newseed)
+  newterm (chars newcomb newseed)
 
 (* [words path comb seed] iterates over all words of the file with the given [path]. *)
-let of_file_words path =
-  let sep c = not (isalpha c) in
-  let fold red = tokens sep path red in
+let of_file_words ?(is_separator = fun c -> not (isalpha c)) path =
+  let fold red = tokens is_separator (file_characters path) red in
   Seqcol (Stream.Stream { Stream.sfold = fold })
 
-let of_file_lines path =
-  let sep c = c = '\n' in
-  let fold red seed = tokens sep path red seed in
+let of_file_lines path = of_file_words ~is_separator:(fun c -> c = '\n') path
+
+let of_string_words ?(is_separator= fun c -> c = ' ') s =
+  let fold red = tokens is_separator (string_chars s) red in
   Seqcol (Stream.Stream { Stream.sfold = fold })
+  
+ 
