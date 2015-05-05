@@ -7,13 +7,13 @@ LIB = $(addprefix _build/, $(TARGETS))
 INSTALL = $(LIB)
 
 all:
-	ocamlbuild -use-ocamlfind $(TARGETS)
+	ocamlbuild -use-ocamlfind -cflags -safe-string $(TARGETS)
 
 doc:
 	ocamlbuild -use-ocamlfind $(DOC)
 
 tests:
-	ocamlbuild -use-ocamlfind tests.native
+	ocamlbuild -use-ocamlfind -cflags -safe-string tests.native
 	_build/tests.native
 
 install: all

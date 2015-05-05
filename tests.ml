@@ -87,8 +87,8 @@ let _ =
   let split_lines = Str.split_delim (Str.regexp "\n") in
   let to_lines = Text.pack_split_reducer split_lines (to_list |> filtering (fun s -> s <> "")) in
   let expected = Col.of_range 1 100 |> map string_of_int |> reduce to_list in
-  let file_lines_1 = "/tmp/foo" |> Col.of_file_chunks 20 |> reduce to_lines in
-  let file_lines_2 = "/tmp/foo" |> Col.of_file_chunks 21 |> reduce to_lines in
+  let file_lines_1 = "/tmp/foo" |> Col.of_file_chunks 20 |> map Bytes.to_string |> reduce to_lines in
+  let file_lines_2 = "/tmp/foo" |> Col.of_file_chunks 21 |> map Bytes.to_string |> reduce to_lines in
   assert (file_lines_1 = expected);
   assert (file_lines_2 = expected);
 

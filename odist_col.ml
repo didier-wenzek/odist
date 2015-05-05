@@ -136,7 +136,7 @@ let fold_file_chunks size path comb seed =
     let l = input channel buffer 0 size in
     if l = 0
     then (close_in channel; acc)
-    else loop (comb acc (String.sub buffer 0 l))
+    else loop (comb acc (Bytes.sub buffer 0 l))
   in try loop seed
      with  error -> close_in channel; raise error
 
@@ -146,7 +146,7 @@ let of_file_chunks size path =
 
 (** folds chars of substring. *)
 let substring_chars str start len comb seed =
-  let get pos = String.get str pos in
+  let get pos = Bytes.get str pos in
   let last = start + len in
   let rec loop pos acc =
     if pos < last
@@ -154,7 +154,7 @@ let substring_chars str start len comb seed =
     else acc
   in loop start seed
 
-let string_chars str = substring_chars str 0 (String.length str)
+let string_chars str = substring_chars (Bytes.of_string str) 0 (String.length str)
 
 (* [file_characters path comb seed] combines all characters of the file with the given [path]. *)
 let file_characters path comb seed =
@@ -202,10 +202,29 @@ let of_file_words ?(is_separator = fun c -> not (isalpha c)) path =
   let fold red = tokens is_separator (file_characters path) red in
   Seqcol (Stream.Stream { Stream.sfold = fold })
 
-let of_file_lines path = of_file_words ~is_separator:(fun c -> c = '\n') path
-
-let of_string_words ?(is_separator= fun c -> c = ' ') s =
-  let fold red = tokens is_separator (string_chars s) red in
+let of_file_lines path = 
+  let fold comb seed =
+    let channel = open_in path in
+    let rec loop acc =
+      match try Some(input_line channel) with End_of_file -> None with
+      | None -> (close_in channel; acc)
+      | Some line -> loop (comb acc line)
+    in try loop seed
+       with error -> close_in channel; raise error
+  in
   Seqcol (Stream.Stream { Stream.sfold = fold })
-  
+
+let of_string_words ?(separator = ' ') str =
+  let n = String.length str in
+  let fold add =
+    let rec loop i acc =
+      if i < n
+      then
+        let j = try String.index_from str i separator with Not_found -> n in
+        let word = String.sub str i (j-i) in
+        loop (j+1) (add acc word)
+      else acc
+    in loop 0
+  in
+  Seqcol (Stream.Stream { Stream.sfold = fold })
  

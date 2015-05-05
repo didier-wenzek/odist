@@ -36,7 +36,7 @@ val of_files: ?recursive:bool -> string -> string Fold.col
    [Col.of_files ~recursive:false rootpath] returns recursively all direct regular files of the given directory.
 *)
 
-val of_file_chunks: int -> string -> string Fold.col
+val of_file_chunks: int -> string -> bytes Fold.col
 (* [Col.of_file_chunks size path] breaks the file in chunks of the given size. *)
 
 val of_file_chars: string -> char Fold.col
@@ -48,5 +48,5 @@ val of_file_lines: string -> string Fold.col
 val of_file_words: ?is_separator:(char->bool) -> string -> string Fold.col
 (* [Col.of_file_words path] returns all words of the given file. *)
 
-val of_string_words: ?is_separator:(char->bool) -> string -> string Fold.col
+val of_string_words: ?separator:char -> string -> string Fold.col
 (* [Col.of_string_words s] returns all words of the given string. *)
